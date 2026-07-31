@@ -1,0 +1,6 @@
+{
+  "name": "VPS Control Panel",
+  "description": "A lightweight, secure, and modern Web-based VPS Management Control Panel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
