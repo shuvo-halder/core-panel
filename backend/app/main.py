@@ -8,7 +8,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from backend.app.api.v1.auth import router as auth_router
 from backend.app.api.v1.health import router as health_router
+from backend.app.api.v1.permissions import router as permissions_router
+from backend.app.api.v1.roles import router as roles_router
+from backend.app.api.v1.users import router as users_router
+from backend.app.auth.service import auth_service
 from backend.app.core.config import settings
 from backend.app.core.errors import (
     AppError,
@@ -28,6 +33,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize SQLite database and baseline migrations
     try:
         db.init_database()
+        auth_service.bootstrap_admin_if_configured()
     except Exception as exc:
         logger.error(f"Failed to initialize SQLite database: {exc}")
 
@@ -90,6 +96,10 @@ def create_application() -> FastAPI:
 
     # Mount API v1 Routers
     app.include_router(health_router, prefix="/api/v1")
+    app.include_router(auth_router, prefix="/api/v1")
+    app.include_router(users_router, prefix="/api/v1")
+    app.include_router(roles_router, prefix="/api/v1")
+    app.include_router(permissions_router, prefix="/api/v1")
 
     return app
 

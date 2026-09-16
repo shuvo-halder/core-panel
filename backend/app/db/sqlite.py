@@ -69,6 +69,132 @@ class Database:
                     (1, "0001_baseline_metadata", now)
                 )
 
+            # Migration 2: Auth and RBAC
+            cursor.execute("SELECT version FROM schema_migrations WHERE version = 2")
+            if not cursor.fetchone():
+                # Create users table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id TEXT PRIMARY KEY,
+                        username TEXT UNIQUE NOT NULL,
+                        email TEXT UNIQUE,
+                        password_hash TEXT NOT NULL,
+                        is_active INTEGER NOT NULL DEFAULT 1,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        last_login_at TEXT
+                    );
+                """)
+
+                # Create roles table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS roles (
+                        id TEXT PRIMARY KEY,
+                        name TEXT UNIQUE NOT NULL,
+                        description TEXT,
+                        is_system INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    );
+                """)
+
+                # Create permissions table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS permissions (
+                        id TEXT PRIMARY KEY,
+                        name TEXT UNIQUE NOT NULL,
+                        description TEXT,
+                        resource TEXT NOT NULL,
+                        action TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    );
+                """)
+
+                # Create user_roles junction table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS user_roles (
+                        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+                        assigned_at TEXT NOT NULL,
+                        PRIMARY KEY (user_id, role_id)
+                    );
+                """)
+
+                # Create role_permissions junction table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS role_permissions (
+                        role_id TEXT NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+                        permission_id TEXT NOT NULL REFERENCES permissions(id) ON DELETE CASCADE,
+                        assigned_at TEXT NOT NULL,
+                        PRIMARY KEY (role_id, permission_id)
+                    );
+                """)
+
+                # Create user_sessions table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS user_sessions (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        ip_address TEXT,
+                        user_agent TEXT,
+                        created_at TEXT NOT NULL,
+                        expires_at TEXT NOT NULL,
+                        last_activity_at TEXT NOT NULL,
+                        is_revoked INTEGER NOT NULL DEFAULT 0
+                    );
+                """)
+
+                # Indexes
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role_id);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);")
+
+                # Seed base permissions
+                base_permissions = [
+                    ("perm_users_read", "users.read", "View user accounts and profiles", "users", "read"),
+                    ("perm_users_manage", "users.manage", "Create, modify, and delete user accounts", "users", "manage"),
+                    ("perm_roles_read", "roles.read", "View roles and granted permissions", "roles", "read"),
+                    ("perm_roles_manage", "roles.manage", "Create, modify, and delete security roles", "roles", "manage"),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in base_permissions:
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (p_id, p_name, p_desc, p_res, p_act, now))
+
+                # Seed default system roles
+                cursor.execute("""
+                    INSERT OR IGNORE INTO roles (id, name, description, is_system, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, ("role_admin", "admin", "Full system administrator", 1, now, now))
+
+                cursor.execute("""
+                    INSERT OR IGNORE INTO roles (id, name, description, is_system, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, ("role_viewer", "viewer", "Read-only system observer", 1, now, now))
+
+                # Link all permissions to admin
+                for p_id, _, _, _, _ in base_permissions:
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                        VALUES (?, ?, ?)
+                    """, ("role_admin", p_id, now))
+
+                # Link read-only permissions to viewer
+                for p_id in ("perm_users_read", "perm_roles_read"):
+                    cursor.execute("""
+                        INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                        VALUES (?, ?, ?)
+                    """, ("role_viewer", p_id, now))
+
+                # Record migration 2
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (2, "0002_auth_and_rbac", now)
+                )
+
             conn.commit()
             logger.info("SQLite database initialized successfully in WAL mode.")
 

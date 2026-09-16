@@ -31,8 +31,15 @@ class Settings(BaseSettings):
     # Security Settings
     SECRET_KEY: str = Field(default="dev-insecure-secret-key-change-in-production-min32char", min_length=32)
     TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
+    SESSION_COOKIE_NAME: str = "corepanel_session"
+    SESSION_COOKIE_SAMESITE: str = "lax"
     RATE_LIMIT_LOGIN_MAX: int = 5
     RATE_LIMIT_LOGIN_WINDOW_SECONDS: int = 900
+
+    # First-Admin Bootstrap (Optional, for zero-touch initialization)
+    BOOTSTRAP_ADMIN_USERNAME: str | None = Field(default=None, description="Username for initial admin")
+    BOOTSTRAP_ADMIN_PASSWORD: str | None = Field(default=None, description="Password for initial admin")
+    BOOTSTRAP_ADMIN_EMAIL: str | None = Field(default=None, description="Email for initial admin")
 
     model_config = SettingsConfigDict(
         env_file=".env",
