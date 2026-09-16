@@ -40,3 +40,56 @@ The Privileged Agent exposes explicit RPC methods with strict parameter typing:
 
 ### Anti-Pattern Prohibition
 The Privileged Agent **MUST NOT** expose a general-purpose execution method like `agent.execute_shell_command(cmd: str)`. Exposing arbitrary shell execution completely defeats privilege separation.
+
+---
+
+## 3. Versioned IPC Protocol Specification
+
+Communication over the Unix domain socket `/run/corepanel/agent.sock` follows a strict JSON protocol:
+
+### Request Format
+```json
+{
+  "version": 1,
+  "requestId": "req_8f1b29a03c",
+  "operation": "systemd.service.status",
+  "payload": {
+    "service": "nginx"
+  }
+}
+```
+
+### Response Format (Success)
+```json
+{
+  "version": 1,
+  "requestId": "req_8f1b29a03c",
+  "success": true,
+  "data": {
+    "service": "nginx",
+    "activeState": "active",
+    "subState": "running",
+    "loadState": "loaded"
+  }
+}
+```
+
+### Response Format (Error)
+```json
+{
+  "version": 1,
+  "requestId": "req_8f1b29a03c",
+  "success": false,
+  "error": {
+    "code": "OPERATION_REJECTED",
+    "message": "Unknown or forbidden operation 'execute_shell'"
+  }
+}
+```
+
+### Protocol Constraints & Security
+1. **Validation:** Both request and response envelopes are strictly validated against Pydantic schemas.
+2. **Malformed Handling:** Non-JSON frames, missing headers, or invalid versions trigger immediate formatted rejection and disconnect.
+3. **Execution Timeouts:** Default timeout of 15 seconds per IPC call prevents socket starvation.
+4. **Socket Permissions:** `/run/corepanel/agent.sock` with permission mask `0660` owned by `root:corepanel`.
+

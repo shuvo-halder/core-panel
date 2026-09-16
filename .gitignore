@@ -1,8 +1,36 @@
+# Node dependencies & builds
 node_modules/
-build/
 dist/
-coverage/
-.DS_Store
+build/
+
+# Python virtual environments & caches
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Compiled Python & Logs
+*.pyc
+*.pyo
 *.log
+
+# Coverage & testing
+.coverage
+htmlcov/
+coverage/
+
+# Environment variables
 .env*
 !.env.example
+
+# Local SQLite databases
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# OS artifacts
+.DS_Store
+

@@ -1,100 +1,137 @@
-# Universal VPS Management Panel
+# CorePanel
 
-A production-grade, self-hosted VPS Management Platform designed to be a lightweight, modern, and highly secure alternative to traditional control panels like cPanel, CyberPanel, and aaPanel. 
-
-Manage 90% of your daily server administration tasks—Nginx, Databases, Docker, System Services, Cron jobs, and more—directly from a sleek, High-Density Web GUI without needing to repeatedly open an SSH terminal.
+CorePanel is a lightweight, modern, and secure Linux server management control panel. It is architected for single-node VPS and dedicated server administration with strict privilege separation, high-performance async APIs, and parameterized system interaction.
 
 ---
 
-## 🌟 Key Features
+## 🏛️ Architecture Overview
 
-* **Real-Time Dashboard:** Monitor CPU, RAM, Disk, Network I/O, and Uptime via WebSockets.
-* **Web Server Manager:** Configure Nginx virtual hosts, issue Let's Encrypt SSLs, and manage PHP/Node proxies.
-* **Database Manager:** Create and manage MySQL/MariaDB and PostgreSQL databases.
-* **File Manager:** Full web-based browser for your server's filesystem.
-* **Security Center:** Manage UFW/Firewalld, Fail2Ban, and SSH hardening.
-* **Web Terminal:** Secure, in-browser bash terminal using Xterm.js.
-* **System Services:** Monitor, start, stop, and restart systemd services.
-* **Cron Job Manager:** Visual interface to schedule Linux tasks.
+CorePanel enforces defense-in-depth through strict process and privilege boundaries:
 
----
-
-## 👥 For Users (Server Administrators)
-
-### Prerequisites
-* A fresh, clean Linux VPS.
-* Supported OS: Ubuntu (20.04/22.04/24.04), Debian (11/12), AlmaLinux/CentOS (8/9), Rocky Linux.
-* Root access.
-
-### Quick Installation
-You can install the panel using our one-line automated installer. This script will detect your OS, install necessary dependencies (Node.js, Nginx, Certbot), build the application, and start the systemd service.
-
-Run the following command as `root`:
-```bash
-curl -sSL https://raw.githubusercontent.com/shuvo-halder/core-panel/refs/heads/main/install.sh | bash
+```text
+React / Vite Frontend (SPA)
+            │
+            │ HTTP / REST / WebSockets / SSE
+            ▼
+Unprivileged Control Plane (FastAPI)
+  - Runs as unprivileged user (`corepanel`)
+  - Request validation & structured error handling
+  - SQLite metadata database (WAL mode)
+  - Safe Linux command runner & OS detection
+            │
+            │ Versioned JSON IPC (0660 Unix Domain Socket)
+            ▼
+Privileged Agent (CoreAgent)
+  - Runs as `root`
+  - Strict operation registry & allowlist
+  - ZERO arbitrary shell execution methods
+            │
+            ▼
+Linux Operating System (/proc, systemd, apt, network)
 ```
 
-### Accessing the Panel
-Once the installation is complete, the installer will output the access URL.
-1. Navigate to `http://<YOUR_SERVER_IP>` in your browser.
-2. Log in using the default generated credentials (check `/etc/corepanel/config.json` or the installer output).
-3. We highly recommend mapping a domain and enabling SSL via the Web Server manager immediately.
+---
+
+## 🔒 Security Principles
+
+1. **Privilege Separation:** The web-facing FastAPI application runs unprivileged. Privileged host interactions are delegated to the local `corepanel-agent` daemon via Unix domain socket (`/run/corepanel/agent.sock`).
+2. **Zero Arbitrary Shell Execution:** Both the backend `LinuxCommandRunner` and the `CoreAgent` operation registry strictly disallow `shell=True` and arbitrary command strings. All commands are parameterized with binary allowlisting and control-character filtering.
+3. **Structured Validation & Redaction:** All API payloads and IPC frames are strictly validated using Pydantic schemas. Application logging uses structured JSON with automatic redaction of sensitive credentials, tokens, and keys.
+4. **Source of Truth:** Real-time host state (services, resource utilization, network interfaces) is queried live from kernel interfaces (`/proc`, systemd) rather than cached indefinitely.
 
 ---
 
-## 💻 For Developers
+## 📂 Repository Structure
 
-We welcome contributions! The panel is built with a modern API-first architecture.
+```text
+.
+├── .env.example                     # Environment template
+├── .gitignore                       # Git ignore definitions
+├── LICENSE                          # MIT License
+├── README.md                        # Project documentation
+├── metadata.json                    # Application metadata
+├── package.json                     # Frontend dependencies
+├── pyproject.toml                   # Python tools (Ruff, Pytest)
+├── index.html                       # Frontend HTML entrypoint
+├── tsconfig.json                    # TypeScript configuration
+├── vite.config.ts                   # Vite bundler configuration
+│
+├── agent/                           # Privileged Agent Daemon
+│   ├── app/
+│   │   ├── ipc/
+│   │   │   ├── protocol.py          # Pydantic IPC Request/Response schemas
+│   │   │   └── server.py            # Async Unix socket server (0660 permissions)
+│   │   ├── operations/
+│   │   │   └── registry.py          # Allowlisted privileged operations
+│   │   └── main.py                  # Agent daemon entrypoint
+│   └── tests/
+│       └── test_agent_ipc.py        # IPC lifecycle & security unit tests
+│
+├── backend/                         # Unprivileged FastAPI Control Plane
+│   ├── requirements.txt             # Production Python dependencies
+│   ├── requirements-dev.txt         # Development & test dependencies
+│   ├── app/
+│   │   ├── main.py                  # FastAPI application factory & middlewares
+│   │   ├── api/
+│   │   │   └── v1/
+│   │   │       └── health.py        # Health check & version endpoints
+│   │   ├── core/
+│   │   │   ├── config.py            # Pydantic settings management
+│   │   │   ├── errors.py            # Unified domain error handling
+│   │   │   └── logging.py           # Redacted structured JSON logging
+│   │   ├── db/
+│   │   │   └── sqlite.py            # WAL-mode SQLite manager & migrations
+│   │   └── linux/
+│   │       ├── contracts.py         # Subsystem interfaces & models
+│   │       ├── os_detect.py         # /etc/os-release parser
+│   │       └── runner.py            # Safe subprocess execution engine
+│   └── tests/
+│       ├── test_app.py              # API endpoint tests
+│       ├── test_db.py               # SQLite WAL & migration tests
+│       ├── test_os_detect.py        # OS matrix compatibility tests
+│       └── test_runner.py           # Command allowlist & injection tests
+│
+├── docs/                            # Architectural Specifications
+│   ├── README.md
+│   ├── architecture/                # Detailed subsystem designs
+│   ├── decisions/                   # Architecture Decision Records (ADRs)
+│   ├── planning/                    # Feature & master roadmaps
+│   ├── security/                    # Threat models & security checklists
+│   └── testing/                     # Test strategy & matrices
+│
+└── src/                             # React SPA Frontend
+    ├── App.tsx                      # Primary UI component
+    ├── index.css                    # Tailwind CSS entrypoint
+    └── main.tsx                     # React DOM mount point
+```
 
-### Tech Stack
-* **Frontend:** React 19, Vite, Tailwind CSS (High Density custom theme).
-* **Backend:** Node.js, Express (TypeScript).
-* **Database:** PostgreSQL via Prisma ORM (planned Phase 2).
-* **Security:** JWT Authentication, Parameterized System Commands (`spawn` without shell evaluation).
+---
 
-### Architecture Documentation
-Please review our architectural documentation before contributing:
-* [System Architecture (Phase 1)](ARCHITECTURE.md)
-* [Database Schema (Phase 2)](SCHEMA.md)
+## 🛠️ Development & Testing
 
-### Local Development Setup
+### Python Backend & Agent Setup
+```bash
+# Install Python dependencies
+pip install -r backend/requirements-dev.txt
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/shuvo-halder/core-panel.git
-   cd vps-panel
-   ```
+# Run Python unit & integration tests
+pytest
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+# Run Ruff linter
+ruff check .
+```
 
-3. **Set up Environment Variables:**
-   Copy the `.env.example` to `.env` and configure your local settings.
-   ```bash
-   cp .env.example .env
-   ```
+### Frontend Setup
+```bash
+# Install frontend dependencies
+npm install
 
-4. **Start the Development Server:**
-   This command starts the Express backend and the Vite frontend middleware concurrently using `tsx`.
-   ```bash
-   npm run dev
-   ```
-   The panel will be available at `http://localhost:3000`.
-
-5. **Build for Production:**
-   ```bash
-   npm run build
-   ```
-   This bundles the React frontend into `/dist` and compiles the Node backend into a standalone `dist/server.cjs` file.
-
-### Security Guidelines
-* **No `shell: true`:** When utilizing child processes (e.g., in `src/syscmd.ts`), **always** use `spawn` with array arguments to prevent Remote Code Execution (RCE) via shell injection.
-* **JWT Auth:** Ensure all API routes are protected using the `requireAuth` middleware from `src/auth.ts`.
-* **Rate Limiting:** Authentication and sensitive endpoints must be rate-limited using `express-rate-limit`.
+# Build frontend bundle
+npm run build
+```
 
 ---
 
 ## 📄 License
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
