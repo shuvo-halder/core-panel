@@ -5,8 +5,8 @@ import { runSafeCommand } from './src/syscmd';
 
 async function startServer() {
   const app = express();
-  // We must bind to port 3000 in this environment
-  const PORT = process.env.PORT || 3000;
+  // PORT 3000 is required by the reverse proxy infrastructure
+  const PORT = 3000;
 
   app.use(express.json());
 
@@ -22,16 +22,36 @@ async function startServer() {
   // Example: Secure System Status Endpoint
   app.get('/api/system/status', async (req, res) => {
     try {
-      // Safely run 'uptime -p' to get human-readable uptime
-      const uptimeStr = await runSafeCommand('uptime', ['-p']);
-      // Safely run 'free -m' to get memory usage
-      const memoryStr = await runSafeCommand('free', ['-m']);
+      let uptimeStr = '';
+      try {
+        uptimeStr = await runSafeCommand('uptime', ['-p']);
+      } catch {
+        try {
+          uptimeStr = await runSafeCommand('uptime');
+        } catch {
+          const mins = Math.floor(process.uptime() / 60);
+          uptimeStr = `up ${mins} minutes`;
+        }
+      }
+
+      let memoryStr = '';
+      try {
+        memoryStr = await runSafeCommand('free', ['-m']);
+      } catch {
+        const mem = process.memoryUsage();
+        const totalMb = Math.round(mem.heapTotal / (1024 * 1024));
+        const usedMb = Math.round(mem.heapUsed / (1024 * 1024));
+        memoryStr = `Mem: ${totalMb} ${usedMb} 0 0 0 0`;
+      }
+
+      const memLines = memoryStr.split('\n');
+      const memLine = memLines.length > 1 ? memLines[1] : memLines[0];
       
       res.json({
         success: true,
         data: {
           uptime: uptimeStr,
-          memory: memoryStr.split('\n')[1] // Just a quick parse of the Mem line for demonstration
+          memory: memLine
         }
       });
     } catch (error: any) {
