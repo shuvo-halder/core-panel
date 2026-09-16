@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { hashPassword } from './auth';
 
 // Ensure data directory exists
 const dataDir = path.join(process.cwd(), 'data');
@@ -45,7 +46,6 @@ export function initDB() {
   if (count === 0) {
     // Note: In production, password should be set via a one-time setup screen.
     // We are seeding 'admin' / 'admin123' for Phase 1 testing.
-    const { hashPassword } = require('./auth');
     const hash = hashPassword('admin123');
     const insertStmt = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)');
     insertStmt.run('admin', hash);
