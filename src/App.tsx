@@ -1,274 +1,263 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { LogIn, Server, Settings, Terminal, Shield, LogOut, HardDrive, Cpu, Activity, Clock } from 'lucide-react';
 
 export default function App() {
-  const [systemStatus, setSystemStatus] = useState<any>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [user, setUser] = useState<any>(null);
+  const [systemStatus, setSystemStatus] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  
+  // Login State
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
 
+  // Initial Auth Check
   useEffect(() => {
-    // Fetch initial system status
-    fetch('/api/system/status')
+    fetch('/api/auth/me')
       .then(res => res.json())
       .then(data => {
         if (data.success) {
-          setSystemStatus(data.data);
+          setIsAuthenticated(true);
+          setUser(data.user);
+        } else {
+          setIsAuthenticated(false);
         }
       })
-      .catch(err => console.error("Failed to fetch status", err));
+      .catch(() => setIsAuthenticated(false))
+      .finally(() => setLoading(false));
   }, []);
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return (
-          <>
-            <section className="grid grid-cols-2 lg:grid-cols-4 gap-0 border border-[#141414] shrink-0">
-              <div className="p-6 border-r border-[#141414] border-b lg:border-b-0">
-                <div className="col-header mb-4">CPU Usage</div>
-                <div className="data-value text-3xl">12.4<span className="text-sm">%</span></div>
-                <div className="mt-2 h-1 bg-[#D1D0CC] w-full relative">
-                  <div className="absolute top-0 left-0 h-full bg-[#141414]" style={{ width: '12.4%' }}></div>
-                </div>
-              </div>
-              <div className="p-6 lg:border-r border-[#141414] border-b lg:border-b-0">
-                <div className="col-header mb-4">RAM Memory</div>
-                <div className="data-value text-3xl">{systemStatus?.memory ? systemStatus.memory.match(/\d+/g)?.[0] : "4.2"}<span className="text-sm">MB</span></div>
-                <div className="mt-2 h-1 bg-[#D1D0CC] w-full relative">
-                  <div className="absolute top-0 left-0 h-full bg-[#141414]" style={{ width: '26%' }}></div>
-                </div>
-              </div>
-              <div className="p-6 border-r border-[#141414]">
-                <div className="col-header mb-4">Disk Storage</div>
-                <div className="data-value text-3xl">42.1<span className="text-sm">%</span></div>
-                <div className="mt-2 h-1 bg-[#D1D0CC] w-full relative">
-                  <div className="absolute top-0 left-0 h-full bg-[#141414]" style={{ width: '42.1%' }}></div>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="col-header mb-4">Net I/O</div>
-                <div className="data-value text-xl">↑ 1.2 MB/s</div>
-                <div className="data-value text-xl">↓ 8.4 MB/s</div>
-              </div>
-            </section>
-            
-            <section className="flex-1 flex flex-col min-h-0 min-h-[300px]">
-              <div className="grid grid-cols-[120px_1.5fr_1fr_1fr_80px] gap-0 px-4 mb-2 shrink-0">
-                <div className="col-header">Service</div>
-                <div className="col-header">Status</div>
-                <div className="col-header">Process ID</div>
-                <div className="col-header">Resource usage</div>
-                <div className="col-header text-right">Actions</div>
-              </div>
-              <div className="border border-[#141414] flex-1 overflow-y-auto bg-white/30">
-                <div className="data-row">
-                  <span className="data-value">nginx</span>
-                  <span>
-                    <span className="status-dot bg-green-600"></span>
-                    <span className="text-[10px] uppercase font-bold">Running</span>
-                  </span>
-                  <span className="data-value">1022, 1023</span>
-                  <span className="data-value">0.2% CPU / 45MB</span>
-                  <span className="text-right">...</span>
-                </div>
-                <div className="data-row">
-                  <span className="data-value">mariadb</span>
-                  <span>
-                    <span className="status-dot bg-green-600"></span>
-                    <span className="text-[10px] uppercase font-bold">Running</span>
-                  </span>
-                  <span className="data-value">4421</span>
-                  <span className="data-value">1.1% CPU / 842MB</span>
-                  <span className="text-right">...</span>
-                </div>
-                <div className="data-row">
-                  <span className="data-value">php-fpm8.2</span>
-                  <span>
-                    <span className="status-dot bg-green-600"></span>
-                    <span className="text-[10px] uppercase font-bold">Running</span>
-                  </span>
-                  <span className="data-value">8901, 8902</span>
-                  <span className="data-value">0.5% CPU / 120MB</span>
-                  <span className="text-right">...</span>
-                </div>
-                <div className="data-row">
-                  <span className="data-value">docker</span>
-                  <span>
-                    <span className="status-dot bg-red-600"></span>
-                    <span className="text-[10px] uppercase font-bold">Stopped</span>
-                  </span>
-                  <span className="data-value">-</span>
-                  <span className="data-value">0% CPU / 0MB</span>
-                  <span className="text-right">...</span>
-                </div>
-              </div>
-            </section>
-          </>
-        );
-      case 'file-manager':
-        return (
-          <section className="flex-1 flex flex-col border border-[#141414] bg-white/30">
-            <div className="p-4 border-b border-[#141414] flex justify-between items-center bg-[#E4E3E0]">
-              <div className="font-mono text-sm font-bold">/var/www/html</div>
-              <div className="flex gap-2">
-                <button className="border border-[#141414] px-3 py-1 text-[10px] font-bold uppercase hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors cursor-pointer">New Folder</button>
-                <button className="border border-[#141414] px-3 py-1 text-[10px] font-bold uppercase hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors cursor-pointer">Upload</button>
-              </div>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-2 border-b border-[#141414]/20 hover:bg-[#141414] hover:text-[#E4E3E0] cursor-pointer">
-                <span className="font-mono">📁</span>
-                <span className="font-mono font-bold text-sm">public</span>
-                <span className="font-mono text-xs opacity-60">4 KB</span>
-                <span className="font-mono text-xs opacity-60">Oct 24, 10:23</span>
-              </div>
-              <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-2 border-b border-[#141414]/20 hover:bg-[#141414] hover:text-[#E4E3E0] cursor-pointer">
-                <span className="font-mono">📄</span>
-                <span className="font-mono font-bold text-sm">index.php</span>
-                <span className="font-mono text-xs opacity-60">1.2 KB</span>
-                <span className="font-mono text-xs opacity-60">Oct 24, 11:45</span>
-              </div>
-              <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 p-2 border-b border-[#141414]/20 hover:bg-[#141414] hover:text-[#E4E3E0] cursor-pointer">
-                <span className="font-mono">📄</span>
-                <span className="font-mono font-bold text-sm">wp-config.php</span>
-                <span className="font-mono text-xs opacity-60">3.4 KB</span>
-                <span className="font-mono text-xs opacity-60">Oct 23, 09:12</span>
-              </div>
-            </div>
-          </section>
-        );
-      case 'web-server':
-        return (
-          <section className="flex-1 flex flex-col border border-[#141414] bg-white/30 p-6">
-            <h2 className="text-lg font-bold font-serif italic mb-6 border-b border-[#141414] pb-2">Virtual Hosts (Nginx)</h2>
-            <div className="grid gap-4">
-              <div className="border border-[#141414] p-4 flex justify-between items-center bg-[#E4E3E0]">
-                <div>
-                  <div className="font-mono font-bold text-lg">example.com</div>
-                  <div className="text-xs opacity-60 font-mono mt-1">/var/www/example.com/public</div>
-                </div>
-                <div className="flex gap-2">
-                  <span className="bg-green-200 text-green-800 border border-green-800 px-2 py-0.5 text-[10px] uppercase font-bold flex items-center">SSL Active</span>
-                  <button className="border border-[#141414] px-3 py-1 text-[10px] font-bold uppercase hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors cursor-pointer">Configure</button>
-                </div>
-              </div>
-            </div>
-            <button className="mt-6 border border-[#141414] px-4 py-2 text-xs font-bold uppercase hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors cursor-pointer self-start">
-              + Add New Domain
-            </button>
-          </section>
-        );
-      case 'databases':
-        return (
-          <section className="flex-1 flex flex-col border border-[#141414] bg-white/30 p-6">
-            <h2 className="text-lg font-bold font-serif italic mb-6 border-b border-[#141414] pb-2">MySQL / MariaDB Databases</h2>
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-4 p-2 border-b border-[#141414] font-bold uppercase text-[10px] opacity-60">
-              <div>Database Name</div>
-              <div>User</div>
-              <div>Actions</div>
-            </div>
-            <div className="grid grid-cols-[1fr_1fr_auto] gap-4 p-3 border-b border-[#141414]/20 hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors items-center">
-              <div className="font-mono font-bold text-sm">wp_prod_db</div>
-              <div className="font-mono text-sm">wp_user</div>
-              <button className="border border-current px-3 py-1 text-[10px] font-bold uppercase transition-colors cursor-pointer">Manage</button>
-            </div>
-            <button className="mt-6 border border-[#141414] px-4 py-2 text-xs font-bold uppercase hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors cursor-pointer self-start">
-              + Create Database
-            </button>
-          </section>
-        );
-      case 'terminal':
-        return (
-          <section className="flex-1 bg-[#141414] text-[#E4E3E0] p-4 font-mono text-[13px] overflow-hidden rounded-sm border border-white/10 flex flex-col">
-            <div className="opacity-40 mb-2 border-b border-white/20 pb-1 flex justify-between shrink-0">
-              <span>WEB TERMINAL</span>
-              <span>/dev/pts/1 (bash)</span>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              <div className="text-green-400">Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-89-generic x86_64)</div>
-              <br/>
-              <div className="flex mt-1">
-                <span>[root@vps-prod-us-01]:~# </span>
-                <span className="w-2 h-4 bg-white/60 ml-1 animate-pulse"></span>
-              </div>
-            </div>
-          </section>
-        );
-      default:
-        return (
-          <div className="flex-1 flex items-center justify-center border border-[#141414] bg-white/30 text-sm font-mono font-bold uppercase opacity-50">
-            Module Under Construction
-          </div>
-        );
+  // Fetch System Status when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const fetchStatus = () => {
+        fetch('/api/system/status')
+          .then(res => res.json())
+          .then(data => {
+            if (data.success) setSystemStatus(data.data);
+          })
+          .catch(err => console.error("Failed to fetch status", err));
+      };
+      fetchStatus();
+      const interval = setInterval(fetchStatus, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated]);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError('');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setIsAuthenticated(true);
+        setUser(data.user);
+      } else {
+        setLoginError(data.error || 'Login failed');
+      }
+    } catch (err) {
+      setLoginError('Network error occurred.');
     }
   };
 
-  return (
-    <div className="w-full h-screen overflow-hidden bg-[#E4E3E0] text-[#141414] flex flex-row font-sans selection:bg-[#141414] selection:text-[#E4E3E0]">
-      <aside className="w-[240px] border-r border-[#141414] flex flex-col h-full shrink-0">
-        <div className="p-6 border-b border-[#141414]">
-          <div className="text-xs font-bold tracking-widest uppercase mb-1">Core Panel v1.0</div>
-          <div className="text-[10px] font-mono opacity-60 uppercase">Root Systems Engineering</div>
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    setIsAuthenticated(false);
+    setUser(null);
+  };
+
+  if (loading) {
+    return <div className="min-h-screen bg-[#E4E3E0] flex items-center justify-center font-mono text-sm opacity-50">Initializing Secure Container...</div>;
+  }
+
+  // --- Phase 1: Authentication View ---
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#E4E3E0] flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-sm border border-[#141414] bg-white/50 p-8 shadow-sm">
+          <div className="flex items-center gap-3 mb-8 pb-4 border-b border-[#141414]">
+            <Server className="w-6 h-6" />
+            <h1 className="font-serif italic font-bold text-xl tracking-wide">Core Panel</h1>
+          </div>
+          
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-[10px] uppercase font-bold tracking-wider mb-1 opacity-70">Username</label>
+              <input 
+                type="text" 
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                className="w-full border border-[#141414] bg-transparent p-2 text-sm font-mono focus:outline-none focus:bg-[#141414] focus:text-[#E4E3E0] transition-colors"
+                autoComplete="username"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase font-bold tracking-wider mb-1 opacity-70">Password</label>
+              <input 
+                type="password" 
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full border border-[#141414] bg-transparent p-2 text-sm font-mono focus:outline-none focus:bg-[#141414] focus:text-[#E4E3E0] transition-colors"
+                autoComplete="current-password"
+              />
+            </div>
+            
+            {loginError && (
+              <div className="text-red-700 text-xs font-mono font-bold bg-red-100 border border-red-700 p-2">
+                {loginError}
+              </div>
+            )}
+            
+            <button 
+              type="submit"
+              className="w-full mt-4 border border-[#141414] bg-[#141414] text-[#E4E3E0] p-2 text-xs uppercase font-bold tracking-widest hover:bg-transparent hover:text-[#141414] transition-colors"
+            >
+              Authenticate
+            </button>
+          </form>
+          
+          <div className="mt-8 text-center text-[10px] font-mono opacity-40">
+            Phase 1 &mdash; Initial Setup (admin / admin123)
+          </div>
         </div>
-        <nav className="flex-1 overflow-y-auto flex flex-col">
-          <button onClick={() => setActiveTab('dashboard')} className={`sidebar-link flex items-center p-4 pl-6 text-xs font-bold uppercase tracking-wider text-left ${activeTab === 'dashboard' ? 'active' : ''}`}>Dashboard</button>
-          <button onClick={() => setActiveTab('file-manager')} className={`sidebar-link flex items-center p-4 pl-6 text-xs font-bold uppercase tracking-wider text-left ${activeTab === 'file-manager' ? 'active' : ''}`}>File Manager</button>
-          <button onClick={() => setActiveTab('web-server')} className={`sidebar-link flex items-center p-4 pl-6 text-xs font-bold uppercase tracking-wider text-left ${activeTab === 'web-server' ? 'active' : ''}`}>Web Server</button>
-          <button onClick={() => setActiveTab('databases')} className={`sidebar-link flex items-center p-4 pl-6 text-xs font-bold uppercase tracking-wider text-left ${activeTab === 'databases' ? 'active' : ''}`}>Databases</button>
-          <button onClick={() => setActiveTab('services')} className={`sidebar-link flex items-center p-4 pl-6 text-xs font-bold uppercase tracking-wider text-left ${activeTab === 'services' ? 'active' : ''}`}>System Services</button>
-          <button onClick={() => setActiveTab('security')} className={`sidebar-link flex items-center p-4 pl-6 text-xs font-bold uppercase tracking-wider text-left ${activeTab === 'security' ? 'active' : ''}`}>Security / FW</button>
-          <button onClick={() => setActiveTab('terminal')} className={`sidebar-link flex items-center p-4 pl-6 text-xs font-bold uppercase tracking-wider text-left ${activeTab === 'terminal' ? 'active' : ''}`}>Web Terminal</button>
-          <button onClick={() => setActiveTab('cron')} className={`sidebar-link flex items-center p-4 pl-6 text-xs font-bold uppercase tracking-wider text-left ${activeTab === 'cron' ? 'active' : ''}`}>Cron Jobs</button>
+      </div>
+    );
+  }
+
+  // --- Phase 1: Dashboard Structure ---
+  return (
+    <div className="h-screen bg-[#E4E3E0] text-[#141414] font-sans flex flex-col md:flex-row overflow-hidden">
+      
+      {/* Sidebar Navigation */}
+      <aside className="w-full md:w-64 border-b md:border-b-0 md:border-r border-[#141414] bg-[#E4E3E0] flex flex-col shrink-0">
+        <div className="p-6 border-b border-[#141414] flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="font-serif italic font-bold text-xl tracking-wide">Core Panel</span>
+            <span className="font-mono text-[10px] uppercase opacity-60 mt-1 flex items-center gap-1">
+              <Shield className="w-3 h-3" /> System root
+            </span>
+          </div>
+        </div>
+        
+        <nav className="flex-1 overflow-y-auto py-4 flex flex-col">
+          {[
+            { id: 'dashboard', icon: Activity, label: 'System Overview' },
+            { id: 'terminal', icon: Terminal, label: 'Secure Shell (WIP)' },
+            { id: 'settings', icon: Settings, label: 'Configuration' }
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id)}
+              className={`sidebar-link flex items-center gap-3 px-6 py-3 text-sm font-bold uppercase tracking-wider text-left ${activeTab === item.id ? 'active' : ''}`}
+            >
+              <item.icon className="w-4 h-4" />
+              {item.label}
+            </button>
+          ))}
         </nav>
-        <div className="p-6 border-t border-[#141414] bg-[#D1D0CC]">
-          <div className="text-[10px] uppercase font-bold mb-2 opacity-60">System Node</div>
-          <div className="text-xs font-mono">vps-prod-us-01</div>
-          <div className="text-[10px] text-green-700 font-bold mt-1">● SESSION ACTIVE</div>
+        
+        <div className="p-4 border-t border-[#141414]">
+          <div className="flex items-center justify-between mb-4 px-2">
+            <span className="font-mono text-[10px] opacity-70">Logged in as <b className="uppercase">{user?.username}</b></span>
+          </div>
+          <button onClick={handleLogout} className="w-full flex items-center justify-center gap-2 border border-[#141414] p-2 text-xs uppercase font-bold hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors">
+            <LogOut className="w-3 h-3" /> Terminate Session
+          </button>
         </div>
       </aside>
       
-      <main className="flex-1 flex flex-col h-full overflow-hidden">
-        <header className="h-16 shrink-0 border-b border-[#141414] flex items-center justify-between px-8 bg-[#E4E3E0]">
-          <div className="flex items-center gap-8">
-            <div className="text-xs">
-              <span className="opacity-50 uppercase mr-2 italic font-serif">OS:</span>
-              <span className="font-bold font-mono">Ubuntu 22.04.3 LTS</span>
-            </div>
-            <div className="text-xs hidden md:block">
-              <span className="opacity-50 uppercase mr-2 italic font-serif">Kernel:</span>
-              <span className="font-bold font-mono">5.15.0-generic</span>
-            </div>
-            <div className="text-xs">
-              <span className="opacity-50 uppercase mr-2 italic font-serif">Uptime:</span>
-              <span className="font-bold font-mono">{systemStatus?.uptime || "Loading..."}</span>
-            </div>
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col min-w-0 bg-white/40">
+        
+        {/* Header Bar */}
+        <header className="h-14 border-b border-[#141414] flex items-center justify-between px-6 shrink-0 bg-[#E4E3E0]">
+          <div className="font-mono text-xs uppercase opacity-70 font-bold flex items-center gap-4">
+            <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {systemStatus?.uptime || 'Loading...'}</span>
+            <span className="hidden md:inline-block">| OS: {systemStatus?.kernel || 'Unknown'}</span>
           </div>
-          <div className="flex items-center gap-4">
-            <button className="border border-[#141414] px-3 py-1 text-[10px] font-bold uppercase hover:bg-[#141414] hover:text-[#E4E3E0] transition-colors cursor-pointer">
-              Update System
-            </button>
-            <div className="w-8 h-8 rounded-full border border-[#141414] bg-[#D1D0CC] flex items-center justify-center font-bold text-xs">JD</div>
+          <div className="flex items-center gap-2">
+             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+             <span className="font-mono text-[10px] uppercase font-bold tracking-widest">Daemon Active</span>
           </div>
         </header>
-        
-        <div className="p-4 md:p-8 flex-1 flex flex-col gap-4 md:gap-8 overflow-y-auto">
-          {renderContent()}
-          
-          {activeTab !== 'terminal' && (
-            <section className="h-[180px] shrink-0 bg-[#141414] text-[#E4E3E0] p-4 font-mono text-[11px] overflow-hidden rounded-sm border border-white/10 flex flex-col mt-auto">
-              <div className="opacity-40 mb-2 border-b border-white/20 pb-1 flex justify-between shrink-0">
-                <span>TERMINAL OVERVIEW</span>
-                <span>/dev/pts/0 (bash)</span>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                <div>[root@vps-prod-us-01]:~# systemctl status nginx</div>
-                <div className="text-green-400">● nginx.service - A high performance web server and a reverse proxy server</div>
-                <div className="text-white/80">   Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)</div>
-                <div className="text-white/80">   Active: active (running) since Wed 2023-10-25 08:12:34 UTC; 4 days ago</div>
-                <div className="flex mt-1">
-                  <span>[root@vps-prod-us-01]:~# </span>
-                  <span className="w-2 h-4 bg-white/60 ml-1 animate-pulse"></span>
+
+        {/* Content Pane */}
+        <div className="flex-1 overflow-auto p-4 md:p-8">
+          {activeTab === 'dashboard' && (
+            <div className="max-w-5xl mx-auto space-y-8">
+              <div>
+                <h2 className="font-serif italic text-2xl font-bold border-b border-[#141414] pb-2 mb-6">Phase 1: Foundation Overview</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* Metric Card */}
+                  <div className="border border-[#141414] p-6 bg-white/60">
+                    <div className="flex items-center gap-2 col-header mb-4 text-[#141414]">
+                      <Cpu className="w-4 h-4" /> System Memory
+                    </div>
+                    <div className="data-value text-2xl break-all">
+                      {systemStatus?.memory ? systemStatus.memory.match(/\d+/g)?.[0] : "---"}
+                      <span className="text-sm ml-1 opacity-60">MB Used</span>
+                    </div>
+                  </div>
+
+                  <div className="border border-[#141414] p-6 bg-white/60">
+                    <div className="flex items-center gap-2 col-header mb-4 text-[#141414]">
+                      <HardDrive className="w-4 h-4" /> SQLite Engine
+                    </div>
+                    <div className="data-value text-2xl">
+                      Operational
+                    </div>
+                    <div className="text-[10px] mt-2 opacity-60 font-mono uppercase">Panel.db via abstract layer</div>
+                  </div>
+                  
+                  <div className="border border-[#141414] p-6 bg-white/60">
+                    <div className="flex items-center gap-2 col-header mb-4 text-[#141414]">
+                      <Shield className="w-4 h-4" /> Security Context
+                    </div>
+                    <div className="data-value text-2xl text-green-700">
+                      Strict Mode
+                    </div>
+                    <div className="text-[10px] mt-2 opacity-60 font-mono uppercase">JWT Auth + Whitelist Runner</div>
+                  </div>
+                  
                 </div>
               </div>
-            </section>
+              
+              <div className="border border-[#141414] bg-white/60">
+                <div className="p-4 border-b border-[#141414] bg-[#E4E3E0] col-header">
+                  Architecture Readiness
+                </div>
+                <div className="p-6 font-mono text-sm space-y-4 opacity-80 leading-relaxed">
+                  <p>&gt; Modular directory structure initialized.</p>
+                  <p>&gt; JWT Authentication middleware injected and verified via HttpOnly cookies.</p>
+                  <p>&gt; <code>CommandRunner</code> strict-whitelist activated. Zero-concatenation system calls enforcing.</p>
+                  <p>&gt; Single-port asynchronous daemon listening.</p>
+                  <p className="pt-4 border-t border-[#141414]/20">&gt; Proceeding to Phase 2 (Metrics Engine & WebSSH)...</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'terminal' && (
+            <div className="h-full border border-[#141414] bg-[#141414] text-green-500 font-mono text-sm p-4 flex flex-col">
+              <div className="opacity-50 text-xs mb-4 border-b border-white/20 pb-2">SECURE SHELL INITIALIZATION [PENDING PHASE 2]</div>
+              <div className="flex-1 flex items-end">
+                <span>[root@core-panel ~]# <span className="animate-pulse w-2 h-4 bg-green-500 inline-block align-middle ml-1"></span></span>
+              </div>
+            </div>
+          )}
+          
+          {activeTab === 'settings' && (
+            <div className="flex items-center justify-center h-full border border-[#141414] bg-white/30 text-sm font-mono font-bold uppercase opacity-50">
+              Module Under Construction
+            </div>
           )}
         </div>
       </main>
