@@ -11,6 +11,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from backend.app.api.v1.auth import router as auth_router
 from backend.app.api.v1.health import router as health_router
 from backend.app.api.v1.permissions import router as permissions_router
+from backend.app.api.v1.processes import router as processes_router
 from backend.app.api.v1.roles import router as roles_router
 from backend.app.api.v1.services import router as services_router
 from backend.app.api.v1.system import router as system_router
@@ -104,6 +105,7 @@ def create_application() -> FastAPI:
     app.include_router(permissions_router, prefix="/api/v1")
     app.include_router(system_router, prefix="/api/v1")
     app.include_router(services_router, prefix="/api/v1")
+    app.include_router(processes_router, prefix="/api/v1")
 
     return app
 

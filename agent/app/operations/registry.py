@@ -2,6 +2,10 @@ import os
 import platform
 from typing import Any, Awaitable, Callable, Dict
 
+from agent.app.operations.processes import (
+    kill_process_operation,
+    terminate_process_operation,
+)
 from agent.app.operations.systemd import (
     handle_service_disable,
     handle_service_enable,
@@ -53,6 +57,10 @@ class OperationRegistry:
         self.register("systemd.service.restart", handle_service_restart)
         self.register("systemd.service.enable", handle_service_enable)
         self.register("systemd.service.disable", handle_service_disable)
+
+        # Allowlisted Process Management Operations (Phase 5)
+        self.register("process.terminate", terminate_process_operation)
+        self.register("process.kill", kill_process_operation)
 
 
 registry = OperationRegistry()

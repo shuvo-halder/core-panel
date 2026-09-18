@@ -227,6 +227,53 @@ class IFilesystemProvider(ABC):
         pass
 
 
+@dataclass(frozen=True)
+class ProcessInfo:
+    pid: int
+    ppid: int
+    name: str
+    username: Optional[str]
+    uid: int
+    state: str
+    cpu_percent: float
+    memory_rss_bytes: int
+    memory_vsz_bytes: int
+    memory_percent: float
+    start_time: str
+    start_time_ticks: int
+    threads: int
+    command_summary: Optional[str] = None
+    is_protected: bool = False
+
+
+@dataclass(frozen=True)
+class ProcessListResult:
+    items: List[ProcessInfo]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class IProcessCollector(ABC):
+    """Contract for safe, unprivileged Linux process discovery and metrics collection."""
+
+    @abstractmethod
+    def list_processes(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+        search: Optional[str] = None,
+        sort_by: str = "cpu",
+        order: str = "desc",
+    ) -> ProcessListResult:
+        pass
+
+    @abstractmethod
+    def get_process(self, pid: int) -> Optional[ProcessInfo]:
+        pass
+
+
 class IProcessProvider(ABC):
     """Contract for process monitoring (Pending Phase 9)."""
 

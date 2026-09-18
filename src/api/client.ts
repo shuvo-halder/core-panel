@@ -1,4 +1,5 @@
 import { ApiErrorResponse } from '../types/auth';
+import { ProcessListResponse, ProcessMutationResult, ProcessSummary } from '../types/process';
 import { ServiceMutationResult, ServiceSummary } from '../types/service';
 import {
   CPUInfo,
@@ -188,6 +189,42 @@ export class ApiClient {
 
   async disableService(unit: string): Promise<ServiceMutationResult> {
     return this.request<ServiceMutationResult>(`/services/${encodeURIComponent(unit)}/disable`, {
+      method: 'POST',
+    });
+  }
+
+  // Linux Process Management endpoints (Phase 5)
+  async listProcesses(params?: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+    sort?: string;
+    order?: 'asc' | 'desc';
+  }): Promise<ProcessListResponse> {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.page_size) query.append('page_size', params.page_size.toString());
+    if (params?.search) query.append('search', params.search);
+    if (params?.sort) query.append('sort', params.sort);
+    if (params?.order) query.append('order', params.order);
+
+    const queryString = query.toString();
+    const endpoint = queryString ? `/processes?${queryString}` : '/processes';
+    return this.request<ProcessListResponse>(endpoint, { method: 'GET' });
+  }
+
+  async getProcess(pid: number): Promise<ProcessSummary> {
+    return this.request<ProcessSummary>(`/processes/${pid}`, { method: 'GET' });
+  }
+
+  async terminateProcess(pid: number): Promise<ProcessMutationResult> {
+    return this.request<ProcessMutationResult>(`/processes/${pid}/terminate`, {
+      method: 'POST',
+    });
+  }
+
+  async killProcess(pid: number): Promise<ProcessMutationResult> {
+    return this.request<ProcessMutationResult>(`/processes/${pid}/kill`, {
       method: 'POST',
     });
   }

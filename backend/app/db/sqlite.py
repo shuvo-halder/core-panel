@@ -385,6 +385,68 @@ class Database:
                     (4, "0004_services_and_audit_log", now),
                 )
 
+            # Migration 5: Processes RBAC Permissions (Phase 5)
+            if current_version < 5:
+                now = datetime.now(timezone.utc).isoformat()
+
+                # Seed Process Management Permissions
+                process_permissions = [
+                    (
+                        "perm_processes_read",
+                        "processes.read",
+                        "View Linux process lists, metrics, and details",
+                        "processes",
+                        "read",
+                    ),
+                    (
+                        "perm_processes_terminate",
+                        "processes.terminate",
+                        "Send SIGTERM to terminate Linux processes",
+                        "processes",
+                        "terminate",
+                    ),
+                    (
+                        "perm_processes_kill",
+                        "processes.kill",
+                        "Send SIGKILL to force kill Linux processes",
+                        "processes",
+                        "kill",
+                    ),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in process_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
+
+                # Assign all process permissions to admin role
+                for p_id, _, _, _, _ in process_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                        VALUES (?, ?, ?)
+                    """,
+                        ("role_admin", p_id, now),
+                    )
+
+                # Assign ONLY processes.read to viewer role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_viewer", "perm_processes_read", now),
+                )
+
+                # Record migration 5
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (5, "0005_processes_permissions", now),
+                )
+
             conn.commit()
             logger.info("SQLite database initialized successfully in WAL mode.")
 
