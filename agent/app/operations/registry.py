@@ -2,6 +2,14 @@ import os
 import platform
 from typing import Any, Awaitable, Callable, Dict
 
+from agent.app.operations.systemd import (
+    handle_service_disable,
+    handle_service_enable,
+    handle_service_restart,
+    handle_service_start,
+    handle_service_stop,
+)
+
 OperationHandler = Callable[[Dict[str, Any]], Awaitable[Dict[str, Any]]]
 
 
@@ -38,6 +46,13 @@ class OperationRegistry:
 
         self.register("agent.ping", handle_ping)
         self.register("system.info", handle_system_info)
+
+        # Allowlisted Systemd Service Operations (Phase 4)
+        self.register("systemd.service.start", handle_service_start)
+        self.register("systemd.service.stop", handle_service_stop)
+        self.register("systemd.service.restart", handle_service_restart)
+        self.register("systemd.service.enable", handle_service_enable)
+        self.register("systemd.service.disable", handle_service_disable)
 
 
 registry = OperationRegistry()

@@ -1,4 +1,5 @@
 import { ApiErrorResponse } from '../types/auth';
+import { ServiceMutationResult, ServiceSummary } from '../types/service';
 import {
   CPUInfo,
   DiskMountInfo,
@@ -150,6 +151,45 @@ export class ApiClient {
 
   async getSystemNetwork(): Promise<NetworkInterfaceInfo[]> {
     return this.request<NetworkInterfaceInfo[]>('/system/network', { method: 'GET' });
+  }
+
+  // Linux Service Management endpoints (Phase 4)
+  async listServices(): Promise<ServiceSummary[]> {
+    return this.request<ServiceSummary[]>('/services', { method: 'GET' });
+  }
+
+  async getService(unit: string): Promise<ServiceSummary> {
+    return this.request<ServiceSummary>(`/services/${encodeURIComponent(unit)}`, { method: 'GET' });
+  }
+
+  async startService(unit: string): Promise<ServiceMutationResult> {
+    return this.request<ServiceMutationResult>(`/services/${encodeURIComponent(unit)}/start`, {
+      method: 'POST',
+    });
+  }
+
+  async stopService(unit: string): Promise<ServiceMutationResult> {
+    return this.request<ServiceMutationResult>(`/services/${encodeURIComponent(unit)}/stop`, {
+      method: 'POST',
+    });
+  }
+
+  async restartService(unit: string): Promise<ServiceMutationResult> {
+    return this.request<ServiceMutationResult>(`/services/${encodeURIComponent(unit)}/restart`, {
+      method: 'POST',
+    });
+  }
+
+  async enableService(unit: string): Promise<ServiceMutationResult> {
+    return this.request<ServiceMutationResult>(`/services/${encodeURIComponent(unit)}/enable`, {
+      method: 'POST',
+    });
+  }
+
+  async disableService(unit: string): Promise<ServiceMutationResult> {
+    return this.request<ServiceMutationResult>(`/services/${encodeURIComponent(unit)}/disable`, {
+      method: 'POST',
+    });
   }
 }
 

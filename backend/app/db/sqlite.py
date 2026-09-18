@@ -280,6 +280,111 @@ class Database:
                     (3, "0003_system_read_permission", now),
                 )
 
+            # Migration 4: Services Management RBAC Permissions and Audit Logs Table (Phase 4)
+            cursor.execute("SELECT version FROM schema_migrations WHERE version = 4")
+            if not cursor.fetchone():
+                logger.info("Applying migration 0004_services_and_audit_log...")
+
+                # 1. Create audit_logs table
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS audit_logs (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT,
+                        username TEXT NOT NULL,
+                        action TEXT NOT NULL,
+                        resource_type TEXT NOT NULL,
+                        resource_id TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        details TEXT,
+                        ip_address TEXT,
+                        request_id TEXT,
+                        created_at TEXT NOT NULL,
+                        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+                    );
+                """)
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at);")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id);")
+
+                # 2. Seed services permissions
+                services_permissions = [
+                    (
+                        "perm_services_read",
+                        "services.read",
+                        "View systemd service units, status, and states",
+                        "services",
+                        "read",
+                    ),
+                    (
+                        "perm_services_start",
+                        "services.start",
+                        "Start systemd services",
+                        "services",
+                        "start",
+                    ),
+                    (
+                        "perm_services_stop",
+                        "services.stop",
+                        "Stop systemd services",
+                        "services",
+                        "stop",
+                    ),
+                    (
+                        "perm_services_restart",
+                        "services.restart",
+                        "Restart systemd services",
+                        "services",
+                        "restart",
+                    ),
+                    (
+                        "perm_services_enable",
+                        "services.enable",
+                        "Enable systemd services at boot",
+                        "services",
+                        "enable",
+                    ),
+                    (
+                        "perm_services_disable",
+                        "services.disable",
+                        "Disable systemd services at boot",
+                        "services",
+                        "disable",
+                    ),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in services_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
+
+                # Assign all service permissions to admin role
+                for p_id, _, _, _, _ in services_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                        VALUES (?, ?, ?)
+                    """,
+                        ("role_admin", p_id, now),
+                    )
+
+                # Assign ONLY services.read to viewer role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_viewer", "perm_services_read", now),
+                )
+
+                # Record migration 4
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (4, "0004_services_and_audit_log", now),
+                )
+
             conn.commit()
             logger.info("SQLite database initialized successfully in WAL mode.")
 

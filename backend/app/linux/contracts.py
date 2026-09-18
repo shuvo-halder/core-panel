@@ -111,6 +111,17 @@ class NetworkInterfaceInfo:
 
 
 @dataclass(frozen=True)
+class ServiceInfo:
+    unit: str
+    description: str
+    load_state: str
+    active_state: str
+    sub_state: str
+    enabled: str
+    main_pid: Optional[int] = None
+
+
+@dataclass(frozen=True)
 class SystemOverview:
     identity: SystemIdentity
     cpu: CPUInfo
@@ -118,6 +129,22 @@ class SystemOverview:
     disks: List[DiskMountInfo]
     network: List[NetworkInterfaceInfo]
     timestamp: str
+
+
+class IServiceCollector(ABC):
+    """Contract for systemd service discovery and status inspection."""
+
+    @abstractmethod
+    def is_available(self) -> bool:
+        pass
+
+    @abstractmethod
+    async def list_services(self) -> List[ServiceInfo]:
+        pass
+
+    @abstractmethod
+    async def get_service(self, unit: str) -> Optional[ServiceInfo]:
+        pass
 
 
 class ISystemInfoCollector(ABC):
