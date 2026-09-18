@@ -100,6 +100,62 @@ class DiskMountInfo:
 
 
 @dataclass(frozen=True)
+class BlockDevicePartInfo:
+    name: str
+    path: str
+    size_bytes: int
+    filesystem: Optional[str]
+    mount_point: Optional[str]
+    uuid: Optional[str]
+    label: Optional[str]
+    is_read_only: bool
+
+
+@dataclass(frozen=True)
+class BlockDeviceInfo:
+    name: str
+    path: str
+    device_type: str  # disk, part, loop, rom
+    size_bytes: int
+    model: Optional[str]
+    vendor: Optional[str]
+    is_removable: bool
+    is_read_only: bool
+    filesystem: Optional[str]
+    mount_point: Optional[str]
+    label: Optional[str]
+    uuid: Optional[str]
+    children: List[BlockDevicePartInfo]
+
+
+@dataclass(frozen=True)
+class FilesystemInfo:
+    device: str
+    mount_point: str
+    fstype: str
+    is_pseudo: bool
+    is_read_only: bool
+    total_bytes: int
+    used_bytes: int
+    available_bytes: int
+    usage_percent: float
+    label: Optional[str]
+    uuid: Optional[str]
+    mount_options: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class StorageOverview:
+    total_bytes: int
+    used_bytes: int
+    available_bytes: int
+    usage_percent: float
+    device_count: int
+    filesystem_count: int
+    mount_count: int
+
+
+@dataclass(frozen=True)
 class NetworkInterfaceInfo:
     name: str
     state: str
@@ -176,6 +232,26 @@ class IDiskCollector(ABC):
 
     @abstractmethod
     def get_disk_mounts(self) -> List[DiskMountInfo]:
+        pass
+
+
+class IStorageCollector(ABC):
+    """Contract for safe Linux storage discovery, block device inventory, and filesystems."""
+
+    @abstractmethod
+    def get_storage_overview(self) -> StorageOverview:
+        pass
+
+    @abstractmethod
+    def get_block_devices(self) -> List[BlockDeviceInfo]:
+        pass
+
+    @abstractmethod
+    def get_filesystems(self, include_pseudo: bool = False) -> List[FilesystemInfo]:
+        pass
+
+    @abstractmethod
+    def get_mounts(self) -> List[FilesystemInfo]:
         pass
 
 

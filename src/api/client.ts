@@ -1,6 +1,7 @@
 import { ApiErrorResponse } from '../types/auth';
 import { ProcessListResponse, ProcessMutationResult, ProcessSummary } from '../types/process';
 import { ServiceMutationResult, ServiceSummary } from '../types/service';
+import { BlockDeviceInfo, FilesystemInfo, StorageOverview } from '../types/storage';
 import {
   CPUInfo,
   DiskMountInfo,
@@ -227,6 +228,24 @@ export class ApiClient {
     return this.request<ProcessMutationResult>(`/processes/${pid}/kill`, {
       method: 'POST',
     });
+  }
+
+  // Linux Storage & Disk Management endpoints (Phase 6)
+  async getStorageOverview(): Promise<StorageOverview> {
+    return this.request<StorageOverview>('/storage/overview', { method: 'GET' });
+  }
+
+  async getStorageDevices(): Promise<BlockDeviceInfo[]> {
+    return this.request<BlockDeviceInfo[]>('/storage/devices', { method: 'GET' });
+  }
+
+  async getStorageFilesystems(includePseudo: boolean = false): Promise<FilesystemInfo[]> {
+    const endpoint = includePseudo ? '/storage/filesystems?include_pseudo=true' : '/storage/filesystems';
+    return this.request<FilesystemInfo[]>(endpoint, { method: 'GET' });
+  }
+
+  async getStorageMounts(): Promise<FilesystemInfo[]> {
+    return this.request<FilesystemInfo[]>('/storage/mounts', { method: 'GET' });
   }
 }
 

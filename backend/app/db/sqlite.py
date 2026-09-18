@@ -447,6 +447,53 @@ class Database:
                     (5, "0005_processes_permissions", now),
                 )
 
+            # Migration 6: Storage RBAC Permissions (Phase 6)
+            if current_version < 6:
+                now = datetime.now(timezone.utc).isoformat()
+
+                # Seed Storage Management Permissions
+                storage_permissions = [
+                    (
+                        "perm_storage_read",
+                        "storage.read",
+                        "View storage devices, filesystems, and disk metrics",
+                        "storage",
+                        "read",
+                    ),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in storage_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
+
+                # Assign storage.read to admin role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_admin", "perm_storage_read", now),
+                )
+
+                # Assign storage.read to viewer role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_viewer", "perm_storage_read", now),
+                )
+
+                # Record migration 6
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (6, "0006_storage_permissions", now),
+                )
+
             conn.commit()
             logger.info("SQLite database initialized successfully in WAL mode.")
 
