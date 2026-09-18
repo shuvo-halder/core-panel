@@ -494,6 +494,51 @@ class Database:
                     (6, "0006_storage_permissions", now),
                 )
 
+            # Migration 7: Add network.read permission and assign to admin and viewer roles
+            if current_version < 7:
+                logger.info("Applying Migration 0007: Seeding network permissions")
+                network_permissions = [
+                    (
+                        "perm_network_read",
+                        "network.read",
+                        "View network interfaces, IP addresses, routing table, and DNS configuration",
+                        "network",
+                        "read",
+                    ),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in network_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
+
+                # Assign network.read to admin role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_admin", "perm_network_read", now),
+                )
+
+                # Assign network.read to viewer role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_viewer", "perm_network_read", now),
+                )
+
+                # Record migration 7
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (7, "0007_network_permissions", now),
+                )
+
             conn.commit()
             logger.info("SQLite database initialized successfully in WAL mode.")
 

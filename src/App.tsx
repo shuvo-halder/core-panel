@@ -7,6 +7,7 @@ import { ServiceManagement } from './components/ServiceManagement';
 import { SystemDashboard } from './components/SystemDashboard';
 import { ProcessManagement } from './components/ProcessManagement';
 import { StorageManagement } from './components/StorageManagement';
+import { NetworkManagement } from './components/NetworkManagement';
 import {
   Shield,
   Users,
@@ -19,11 +20,12 @@ import {
   Loader2,
   Cpu,
   HardDrive,
+  Radio,
 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { user, permissions, isAuthenticated, isLoading, logout, hasPermission } = useAuth();
-  const [activeTab, setActiveTab] = useState<'system' | 'services' | 'processes' | 'storage' | 'overview' | 'users' | 'roles'>('system');
+  const [activeTab, setActiveTab] = useState<'system' | 'services' | 'processes' | 'storage' | 'network' | 'overview' | 'users' | 'roles'>('system');
 
   if (isLoading) {
     return (
@@ -42,6 +44,7 @@ const AppContent: React.FC = () => {
   const canReadServices = hasPermission('services.read');
   const canReadProcesses = hasPermission('processes.read');
   const canReadStorage = hasPermission('storage.read');
+  const canReadNetwork = hasPermission('network.read');
   const canReadUsers = hasPermission('users.read');
   const canReadRoles = hasPermission('roles.read');
 
@@ -159,6 +162,21 @@ const AppContent: React.FC = () => {
               </button>
             )}
 
+            {canReadNetwork && (
+              <button
+                id="nav-network-btn"
+                onClick={() => setActiveTab('network')}
+                className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  activeTab === 'network'
+                    ? 'bg-neutral-800 text-white shadow-xs'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-850'
+                }`}
+              >
+                <Radio className="w-4 h-4 text-neutral-400" />
+                <span>Network</span>
+              </button>
+            )}
+
             <button
               id="nav-overview-btn"
               onClick={() => setActiveTab('overview')}
@@ -215,6 +233,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'services' && canReadServices && <ServiceManagement />}
           {activeTab === 'processes' && canReadProcesses && <ProcessManagement />}
           {activeTab === 'storage' && canReadStorage && <StorageManagement />}
+          {activeTab === 'network' && canReadNetwork && <NetworkManagement />}
 
           {activeTab === 'overview' && (
             <div className="space-y-6">

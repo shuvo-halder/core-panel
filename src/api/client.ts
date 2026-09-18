@@ -2,6 +2,7 @@ import { ApiErrorResponse } from '../types/auth';
 import { ProcessListResponse, ProcessMutationResult, ProcessSummary } from '../types/process';
 import { ServiceMutationResult, ServiceSummary } from '../types/service';
 import { BlockDeviceInfo, FilesystemInfo, StorageOverview } from '../types/storage';
+import { DNSConfigInfo, InterfaceDetailInfo, NetworkOverview, RouteInfo } from '../types/network';
 import {
   CPUInfo,
   DiskMountInfo,
@@ -246,6 +247,29 @@ export class ApiClient {
 
   async getStorageMounts(): Promise<FilesystemInfo[]> {
     return this.request<FilesystemInfo[]>('/storage/mounts', { method: 'GET' });
+  }
+
+  // Linux Network Management endpoints (Phase 7)
+  async getNetworkOverview(): Promise<NetworkOverview> {
+    return this.request<NetworkOverview>('/network/overview', { method: 'GET' });
+  }
+
+  async getNetworkInterfaces(): Promise<InterfaceDetailInfo[]> {
+    return this.request<InterfaceDetailInfo[]>('/network/interfaces', { method: 'GET' });
+  }
+
+  async getNetworkInterface(name: string): Promise<InterfaceDetailInfo> {
+    return this.request<InterfaceDetailInfo>(`/network/interfaces/${encodeURIComponent(name)}`, {
+      method: 'GET',
+    });
+  }
+
+  async getNetworkRoutes(): Promise<RouteInfo[]> {
+    return this.request<RouteInfo[]>('/network/routes', { method: 'GET' });
+  }
+
+  async getNetworkDNS(): Promise<DNSConfigInfo> {
+    return this.request<DNSConfigInfo>('/network/dns', { method: 'GET' });
   }
 }
 

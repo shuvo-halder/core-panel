@@ -167,6 +167,84 @@ class NetworkInterfaceInfo:
 
 
 @dataclass(frozen=True)
+class IPAddressInfo:
+    family: str  # "ipv4" | "ipv6"
+    address: str
+    prefix_length: Optional[int] = None
+    scope: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class InterfaceStats:
+    rx_bytes: int
+    rx_packets: int
+    rx_errors: int
+    rx_dropped: int
+    tx_bytes: int
+    tx_packets: int
+    tx_errors: int
+    tx_dropped: int
+
+
+@dataclass(frozen=True)
+class InterfaceDetailInfo:
+    name: str
+    index: Optional[int]
+    iftype: str
+    operational_state: str  # "up", "down", "unknown", "dormant"
+    administrative_state: Optional[str]
+    mtu: Optional[int]
+    mac_address: Optional[str]
+    flags: List[str]
+    is_loopback: bool
+    is_virtual: bool
+    is_physical: bool
+    ipv4_addresses: List[str]
+    ipv6_addresses: List[str]
+    addresses: List[IPAddressInfo]
+    stats: InterfaceStats
+    speed_mbps: Optional[int] = None
+    duplex: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class RouteInfo:
+    destination: str
+    gateway: str
+    interface: str
+    flags: str
+    metric: int
+    family: str  # "ipv4" | "ipv6"
+    mask: Optional[str] = None
+    is_default: bool = False
+
+
+@dataclass(frozen=True)
+class DNSConfigInfo:
+    nameservers: List[str]
+    search_domains: List[str]
+    options: List[str]
+    source: str
+    is_symlink: bool
+    symlink_target: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class NetworkOverview:
+    total_interfaces: int
+    up_interfaces: int
+    down_interfaces: int
+    physical_interfaces: int
+    virtual_interfaces: int
+    loopback_interfaces: int
+    ipv4_addresses: List[str]
+    ipv6_addresses: List[str]
+    default_ipv4_route: Optional[str]
+    default_ipv6_route: Optional[str]
+    dns_servers: List[str]
+
+
+@dataclass(frozen=True)
 class ServiceInfo:
     unit: str
     description: str
@@ -256,10 +334,36 @@ class IStorageCollector(ABC):
 
 
 class INetworkCollector(ABC):
-    """Contract for network interfaces and traffic metrics collection."""
+    """Contract for safe, read-only Linux network discovery, interfaces, routing, and DNS."""
 
     @abstractmethod
     def get_network_interfaces(self) -> List[NetworkInterfaceInfo]:
+        """Legacy lightweight network interface summary used by SystemOverview."""
+        pass
+
+    @abstractmethod
+    def get_interface_details(self) -> List[InterfaceDetailInfo]:
+        """Detailed interface inventory with MTU, MAC, type, flags, stats, and addresses."""
+        pass
+
+    @abstractmethod
+    def get_interface_by_name(self, name: str) -> Optional[InterfaceDetailInfo]:
+        """Detailed information for a single specific network interface."""
+        pass
+
+    @abstractmethod
+    def get_routes(self) -> List[RouteInfo]:
+        """Read-only IPv4 and IPv6 routing table entries."""
+        pass
+
+    @abstractmethod
+    def get_dns_config(self) -> DNSConfigInfo:
+        """Read-only DNS configuration (nameservers, search domains, source)."""
+        pass
+
+    @abstractmethod
+    def get_network_overview(self) -> NetworkOverview:
+        """Aggregated network KPIs and summary metrics."""
         pass
 
 

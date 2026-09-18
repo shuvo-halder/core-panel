@@ -126,3 +126,42 @@ def validate_service_unit_name(unit: str) -> str:
         )
 
     return clean_unit
+
+
+# Linux network interface name pattern (IFNAMSIZ typically 16 chars including null terminator)
+INTERFACE_NAME_PATTERN: Pattern[str] = re.compile(r"^[a-zA-Z0-9_\@\.\:\-]+$")
+
+
+def validate_interface_name(name: Any) -> str:
+    """
+    Strictly validates a Linux network interface name.
+    Rejects path traversal, whitespace, slashes, null bytes, shell metacharacters, and oversized strings.
+    Raises BadRequestError on validation failure.
+    """
+    if not isinstance(name, str):
+        raise BadRequestError("Interface name must be a string", code="INVALID_INTERFACE_NAME")
+
+    clean_name = name.strip()
+    if not clean_name:
+        raise BadRequestError("Interface name cannot be empty", code="INVALID_INTERFACE_NAME")
+
+    if len(clean_name) > 15:
+        raise BadRequestError(
+            f"Interface name exceeds Linux IFNAMSIZ limit of 15 characters: '{clean_name}'",
+            code="INVALID_INTERFACE_NAME",
+        )
+
+    if PROHIBITED_CHARS_PATTERN.search(clean_name) or ".." in clean_name or "/" in clean_name or "\\" in clean_name:
+        raise BadRequestError(
+            "Interface name contains prohibited characters, slashes, or path traversal",
+            code="INVALID_INTERFACE_NAME",
+        )
+
+    if not INTERFACE_NAME_PATTERN.match(clean_name):
+        raise BadRequestError(
+            f"Invalid interface name format: '{clean_name}'",
+            code="INVALID_INTERFACE_NAME",
+        )
+
+    return clean_name
+
