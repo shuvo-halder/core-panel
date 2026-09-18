@@ -11,11 +11,13 @@ from backend.app.linux.contracts import CommandResult, ICommandRunner
 
 class SecurityError(Exception):
     """Raised when a command violates security policies."""
+
     pass
 
 
 class CommandTimeoutError(Exception):
     """Raised when command execution exceeds timeout."""
+
     pass
 
 
@@ -56,8 +58,14 @@ class LinuxCommandRunner(ICommandRunner):
             )
 
         resolved_path = shutil.which(executable)
-        if not resolved_path or not os.path.isfile(resolved_path) or not os.access(resolved_path, os.X_OK):
-            raise SecurityError(f"Execution rejected: Binary '{executable}' not found or not executable.")
+        if (
+            not resolved_path
+            or not os.path.isfile(resolved_path)
+            or not os.access(resolved_path, os.X_OK)
+        ):
+            raise SecurityError(
+                f"Execution rejected: Binary '{executable}' not found or not executable."
+            )
 
         return resolved_path
 
@@ -74,7 +82,7 @@ class LinuxCommandRunner(ICommandRunner):
         executable: str,
         args: Optional[List[str]] = None,
         timeout_seconds: float = 30.0,
-        max_output_bytes: int = 1024 * 1024
+        max_output_bytes: int = 1024 * 1024,
     ) -> CommandResult:
         args = args or []
         resolved_bin = self._resolve_executable(executable)
@@ -84,16 +92,12 @@ class LinuxCommandRunner(ICommandRunner):
         try:
             # shell=False is enforced implicitly by create_subprocess_exec
             proc = await asyncio.create_subprocess_exec(
-                resolved_bin,
-                *args,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                resolved_bin, *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
             )
 
             try:
                 stdout_data, stderr_data = await asyncio.wait_for(
-                    proc.communicate(),
-                    timeout=timeout_seconds
+                    proc.communicate(), timeout=timeout_seconds
                 )
             except asyncio.TimeoutError:
                 try:
@@ -116,7 +120,7 @@ class LinuxCommandRunner(ICommandRunner):
                 stdout=stdout_str.strip(),
                 stderr=stderr_str.strip(),
                 exit_code=proc.returncode if proc.returncode is not None else -1,
-                duration_ms=round(duration_ms, 2)
+                duration_ms=round(duration_ms, 2),
             )
 
         except (SecurityError, CommandTimeoutError):
@@ -125,12 +129,12 @@ class LinuxCommandRunner(ICommandRunner):
             duration_ms = (time.monotonic() - start_time) * 1000
             logger.error(f"Execution failed for {executable}: {str(exc)}")
             return CommandResult(
-                executable=resolved_bin if 'resolved_bin' in locals() else executable,
+                executable=resolved_bin if "resolved_bin" in locals() else executable,
                 args=args,
                 stdout="",
                 stderr=str(exc),
                 exit_code=1,
-                duration_ms=round(duration_ms, 2)
+                duration_ms=round(duration_ms, 2),
             )
 
 

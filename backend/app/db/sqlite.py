@@ -54,11 +54,11 @@ class Database:
             if not row:
                 cursor.execute(
                     "INSERT INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)",
-                    ("version", settings.APP_VERSION, now)
+                    ("version", settings.APP_VERSION, now),
                 )
                 cursor.execute(
                     "INSERT INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)",
-                    ("environment", settings.ENVIRONMENT, now)
+                    ("environment", settings.ENVIRONMENT, now),
                 )
 
             # Record initial baseline migration
@@ -66,7 +66,7 @@ class Database:
             if not cursor.fetchone():
                 cursor.execute(
                     "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
-                    (1, "0001_baseline_metadata", now)
+                    (1, "0001_baseline_metadata", now),
                 )
 
             # Migration 2: Auth and RBAC
@@ -146,53 +146,138 @@ class Database:
 
                 # Indexes
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
-                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);")
-                cursor.execute("CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role_id);")
-                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);")
-                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);")
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_user_roles_user ON user_roles(user_id);"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role_id);"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);"
+                )
+                cursor.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);"
+                )
 
                 # Seed base permissions
                 base_permissions = [
-                    ("perm_users_read", "users.read", "View user accounts and profiles", "users", "read"),
-                    ("perm_users_manage", "users.manage", "Create, modify, and delete user accounts", "users", "manage"),
-                    ("perm_roles_read", "roles.read", "View roles and granted permissions", "roles", "read"),
-                    ("perm_roles_manage", "roles.manage", "Create, modify, and delete security roles", "roles", "manage"),
+                    (
+                        "perm_users_read",
+                        "users.read",
+                        "View user accounts and profiles",
+                        "users",
+                        "read",
+                    ),
+                    (
+                        "perm_users_manage",
+                        "users.manage",
+                        "Create, modify, and delete user accounts",
+                        "users",
+                        "manage",
+                    ),
+                    (
+                        "perm_roles_read",
+                        "roles.read",
+                        "View roles and granted permissions",
+                        "roles",
+                        "read",
+                    ),
+                    (
+                        "perm_roles_manage",
+                        "roles.manage",
+                        "Create, modify, and delete security roles",
+                        "roles",
+                        "manage",
+                    ),
                 ]
                 for p_id, p_name, p_desc, p_res, p_act in base_permissions:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
                         VALUES (?, ?, ?, ?, ?, ?)
-                    """, (p_id, p_name, p_desc, p_res, p_act, now))
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
 
                 # Seed default system roles
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT OR IGNORE INTO roles (id, name, description, is_system, created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?)
-                """, ("role_admin", "admin", "Full system administrator", 1, now, now))
+                """,
+                    ("role_admin", "admin", "Full system administrator", 1, now, now),
+                )
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT OR IGNORE INTO roles (id, name, description, is_system, created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?)
-                """, ("role_viewer", "viewer", "Read-only system observer", 1, now, now))
+                """,
+                    ("role_viewer", "viewer", "Read-only system observer", 1, now, now),
+                )
 
                 # Link all permissions to admin
                 for p_id, _, _, _, _ in base_permissions:
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
                         VALUES (?, ?, ?)
-                    """, ("role_admin", p_id, now))
+                    """,
+                        ("role_admin", p_id, now),
+                    )
 
                 # Link read-only permissions to viewer
                 for p_id in ("perm_users_read", "perm_roles_read"):
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
                         VALUES (?, ?, ?)
-                    """, ("role_viewer", p_id, now))
+                    """,
+                        ("role_viewer", p_id, now),
+                    )
 
                 # Record migration 2
                 cursor.execute(
                     "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
-                    (2, "0002_auth_and_rbac", now)
+                    (2, "0002_auth_and_rbac", now),
+                )
+
+            # Migration 3: System Read RBAC Permission (Phase 3)
+            cursor.execute("SELECT version FROM schema_migrations WHERE version = 3")
+            if not cursor.fetchone():
+                logger.info("Applying migration 0003_system_read_permission...")
+                system_permissions = [
+                    (
+                        "perm_system_read",
+                        "system.read",
+                        "View system metrics, OS identity, and resource utilization",
+                        "system",
+                        "read",
+                    ),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in system_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
+
+                # Assign system.read to admin and viewer roles
+                for role_id in ("role_admin", "role_viewer"):
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                        VALUES (?, ?, ?)
+                    """,
+                        (role_id, "perm_system_read", now),
+                    )
+
+                # Record migration 3
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (3, "0003_system_read_permission", now),
                 )
 
             conn.commit()
@@ -208,7 +293,9 @@ class Database:
     def get_applied_migrations(self) -> List[Dict[str, Any]]:
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT version, name, applied_at FROM schema_migrations ORDER BY version ASC")
+            cursor.execute(
+                "SELECT version, name, applied_at FROM schema_migrations ORDER BY version ASC"
+            )
             return [dict(row) for row in cursor.fetchall()]
 
 

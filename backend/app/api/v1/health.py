@@ -27,9 +27,7 @@ async def get_health() -> HealthResponse:
     Guaranteed fast response; executes zero expensive subshell or OS inspection commands.
     """
     return HealthResponse(
-        status="ok",
-        version=settings.APP_VERSION,
-        timestamp=datetime.now(timezone.utc).isoformat()
+        status="ok", version=settings.APP_VERSION, timestamp=datetime.now(timezone.utc).isoformat()
     )
 
 
@@ -37,7 +35,5 @@ async def get_health() -> HealthResponse:
 async def get_version() -> VersionResponse:
     """Application and environment version details."""
     return VersionResponse(
-        name=settings.APP_NAME,
-        version=settings.APP_VERSION,
-        environment=settings.ENVIRONMENT
+        name=settings.APP_NAME, version=settings.APP_VERSION, environment=settings.ENVIRONMENT
     )

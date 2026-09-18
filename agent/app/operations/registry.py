@@ -26,18 +26,14 @@ class OperationRegistry:
 
     def _register_default_operations(self) -> None:
         async def handle_ping(payload: Dict[str, Any]) -> Dict[str, Any]:
-            return {
-                "status": "ready",
-                "role": "privileged_agent",
-                "pid": os.getpid()
-            }
+            return {"status": "ready", "role": "privileged_agent", "pid": os.getpid()}
 
         async def handle_system_info(payload: Dict[str, Any]) -> Dict[str, Any]:
             return {
                 "system": platform.system(),
                 "release": platform.release(),
                 "machine": platform.machine(),
-                "python": platform.python_version()
+                "python": platform.python_version(),
             }
 
         self.register("agent.ping", handle_ping)

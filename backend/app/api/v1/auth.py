@@ -62,7 +62,9 @@ async def logout(request: Request, response: Response) -> dict:
 
 
 @router.get("/me", response_model=AuthMeResponse)
-async def get_current_user_profile(current_user: UserRead = Depends(require_auth)) -> AuthMeResponse:
+async def get_current_user_profile(
+    current_user: UserRead = Depends(require_auth),
+) -> AuthMeResponse:
     """Return the authenticated user profile, roles, and effective permissions."""
     return AuthMeResponse(
         user=current_user,

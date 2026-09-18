@@ -76,12 +76,16 @@ async def test_auth_login_and_logout_flow():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # 1. Invalid Login
-        res_fail = await client.post("/api/v1/auth/login", json={"username": "alice", "password": "WrongPassword"})
+        res_fail = await client.post(
+            "/api/v1/auth/login", json={"username": "alice", "password": "WrongPassword"}
+        )
         assert res_fail.status_code == 401
         assert res_fail.json()["error"]["code"] == "UNAUTHORIZED"
 
         # 2. Valid Login
-        res_login = await client.post("/api/v1/auth/login", json={"username": "alice", "password": "SecurePassword123!"})
+        res_login = await client.post(
+            "/api/v1/auth/login", json={"username": "alice", "password": "SecurePassword123!"}
+        )
         assert res_login.status_code == 200
         data = res_login.json()
         assert data["success"] is True
@@ -99,11 +103,15 @@ async def test_auth_login_and_logout_flow():
         assert "users.read" in res_me.json()["effective_permissions"]
 
         # 4. Logout
-        res_logout = await client.post("/api/v1/auth/logout", cookies={"corepanel_session": cookie_val})
+        res_logout = await client.post(
+            "/api/v1/auth/logout", cookies={"corepanel_session": cookie_val}
+        )
         assert res_logout.status_code == 200
 
         # 5. Access /auth/me after logout must be 401
-        res_me_after = await client.get("/api/v1/auth/me", cookies={"corepanel_session": cookie_val})
+        res_me_after = await client.get(
+            "/api/v1/auth/me", cookies={"corepanel_session": cookie_val}
+        )
         assert res_me_after.status_code == 401
 
 
@@ -124,7 +132,9 @@ async def test_deactivated_user_cannot_login_or_access():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # Cannot login
-        res = await client.post("/api/v1/auth/login", json={"username": "bob", "password": "BobPassword123!"})
+        res = await client.post(
+            "/api/v1/auth/login", json={"username": "bob", "password": "BobPassword123!"}
+        )
         assert res.status_code == 401
         assert "deactivated" in res.json()["error"]["message"].lower()
 
@@ -161,7 +171,9 @@ async def test_rbac_permission_enforcement():
         assert res_unauth.status_code == 401
 
         # 2. Login as Viewer
-        login_viewer = await client.post("/api/v1/auth/login", json={"username": "viewer_user", "password": "ViewerPassword123!"})
+        login_viewer = await client.post(
+            "/api/v1/auth/login", json={"username": "viewer_user", "password": "ViewerPassword123!"}
+        )
         viewer_cookie = {"corepanel_session": login_viewer.cookies.get("corepanel_session")}
 
         # Viewer can read users
@@ -179,7 +191,9 @@ async def test_rbac_permission_enforcement():
         assert res_create_forbidden.json()["error"]["code"] == "FORBIDDEN"
 
         # 3. Login as Admin
-        login_admin = await client.post("/api/v1/auth/login", json={"username": "admin_user", "password": "AdminPassword123!"})
+        login_admin = await client.post(
+            "/api/v1/auth/login", json={"username": "admin_user", "password": "AdminPassword123!"}
+        )
         admin_cookie = {"corepanel_session": login_admin.cookies.get("corepanel_session")}
 
         # Admin CAN create user -> 201
@@ -207,7 +221,9 @@ async def test_user_management_crud_and_safety_checks():
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        login_admin = await client.post("/api/v1/auth/login", json={"username": "superadmin", "password": "SuperPassword123!"})
+        login_admin = await client.post(
+            "/api/v1/auth/login", json={"username": "superadmin", "password": "SuperPassword123!"}
+        )
         admin_cookie = {"corepanel_session": login_admin.cookies.get("corepanel_session")}
 
         # 1. Duplicate username conflict
@@ -261,7 +277,9 @@ async def test_roles_and_permissions_endpoints():
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        login_res = await client.post("/api/v1/auth/login", json={"username": "admin_sec", "password": "SecPassword123!"})
+        login_res = await client.post(
+            "/api/v1/auth/login", json={"username": "admin_sec", "password": "SecPassword123!"}
+        )
         cookie = {"corepanel_session": login_res.cookies.get("corepanel_session")}
 
         # List permissions
@@ -281,7 +299,11 @@ async def test_roles_and_permissions_endpoints():
         # Create custom role
         res_new_role = await client.post(
             "/api/v1/roles",
-            json={"name": "user_operator", "description": "Custom role for user ops", "permissions": ["users.read", "users.manage"]},
+            json={
+                "name": "user_operator",
+                "description": "Custom role for user ops",
+                "permissions": ["users.read", "users.manage"],
+            },
             cookies=cookie,
         )
         assert res_new_role.status_code == 201

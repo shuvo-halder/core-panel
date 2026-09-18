@@ -27,10 +27,7 @@ async def test_agent_ipc_lifecycle_and_ping():
 
         try:
             req = IPCRequest(
-                version=1,
-                requestId="req_test_123",
-                operation="agent.ping",
-                payload={}
+                version=1, requestId="req_test_123", operation="agent.ping", payload={}
             )
             raw_res = await send_ipc_message(socket_path, req.model_dump_json())
             res = IPCResponse.model_validate_json(raw_res)
@@ -55,7 +52,7 @@ async def test_agent_ipc_rejects_unknown_operation():
                 version=1,
                 requestId="req_test_unknown",
                 operation="shell.execute",
-                payload={"command": "whoami"}
+                payload={"command": "whoami"},
             )
             raw_res = await send_ipc_message(socket_path, req.model_dump_json())
             res = IPCResponse.model_validate_json(raw_res)

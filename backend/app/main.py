@@ -12,6 +12,7 @@ from backend.app.api.v1.auth import router as auth_router
 from backend.app.api.v1.health import router as health_router
 from backend.app.api.v1.permissions import router as permissions_router
 from backend.app.api.v1.roles import router as roles_router
+from backend.app.api.v1.system import router as system_router
 from backend.app.api.v1.users import router as users_router
 from backend.app.auth.service import auth_service
 from backend.app.core.config import settings
@@ -49,7 +50,7 @@ def create_application() -> FastAPI:
         version=settings.APP_VERSION,
         docs_url="/api/docs" if not settings.is_production else None,
         redoc_url=None,
-        lifespan=lifespan
+        lifespan=lifespan,
     )
 
     # CORS configuration
@@ -77,14 +78,14 @@ def create_application() -> FastAPI:
             if not request.url.path.endswith("/health"):
                 logger.info(
                     f"{request.method} {request.url.path} -> {response.status_code} ({duration_ms}ms)",
-                    extra={"request_id": req_id, "duration_ms": duration_ms}
+                    extra={"request_id": req_id, "duration_ms": duration_ms},
                 )
             return response
         except Exception as exc:
             duration_ms = round((time.monotonic() - start_time) * 1000, 2)
             logger.error(
                 f"Unhandled exception during {request.method} {request.url.path}: {exc}",
-                extra={"request_id": req_id, "duration_ms": duration_ms}
+                extra={"request_id": req_id, "duration_ms": duration_ms},
             )
             return await unhandled_exception_handler(request, exc)
 
@@ -100,6 +101,7 @@ def create_application() -> FastAPI:
     app.include_router(users_router, prefix="/api/v1")
     app.include_router(roles_router, prefix="/api/v1")
     app.include_router(permissions_router, prefix="/api/v1")
+    app.include_router(system_router, prefix="/api/v1")
 
     return app
 

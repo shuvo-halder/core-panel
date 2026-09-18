@@ -44,6 +44,7 @@ def require_permission(permission_name: str) -> Callable:
     Factory creating a FastAPI dependency that verifies the user possesses
     the explicitly specified RBAC permission identifier.
     """
+
     async def permission_checker(current_user: UserRead = Depends(require_auth)) -> UserRead:
         if permission_name not in current_user.permissions:
             logger.warning(

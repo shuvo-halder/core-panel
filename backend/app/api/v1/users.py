@@ -16,13 +16,17 @@ async def list_users(_: UserRead = Depends(require_permission("users.read"))) ->
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-async def create_user(payload: UserCreate, _: UserRead = Depends(require_permission("users.manage"))) -> UserRead:
+async def create_user(
+    payload: UserCreate, _: UserRead = Depends(require_permission("users.manage"))
+) -> UserRead:
     """Create a new user account with role assignment."""
     return auth_service.create_user(payload)
 
 
 @router.get("/{user_id}", response_model=UserRead)
-async def get_user(user_id: str, _: UserRead = Depends(require_permission("users.read"))) -> UserRead:
+async def get_user(
+    user_id: str, _: UserRead = Depends(require_permission("users.read"))
+) -> UserRead:
     """Fetch user details by ID."""
     return auth_service.get_user_by_id(user_id)
 

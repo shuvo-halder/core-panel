@@ -59,7 +59,7 @@ class OSProvider(IOSProvider):
             version=version,
             architecture=arch,
             kernel_version=kernel,
-            is_supported=is_supported
+            is_supported=is_supported,
         )
 
 

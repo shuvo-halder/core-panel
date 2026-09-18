@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { LoginForm } from './components/LoginForm';
 import { UserManagement } from './components/UserManagement';
 import { RoleManagement } from './components/RoleManagement';
+import { SystemDashboard } from './components/SystemDashboard';
 import {
   Shield,
   Users,
@@ -13,11 +14,12 @@ import {
   Lock,
   Server,
   Loader2,
+  Cpu,
 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { user, permissions, isAuthenticated, isLoading, logout, hasPermission } = useAuth();
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'roles'>('overview');
+  const [activeTab, setActiveTab] = useState<'system' | 'overview' | 'users' | 'roles'>('system');
 
   if (isLoading) {
     return (
@@ -32,6 +34,7 @@ const AppContent: React.FC = () => {
     return <LoginForm />;
   }
 
+  const canReadSystem = hasPermission('system.read');
   const canReadUsers = hasPermission('users.read');
   const canReadRoles = hasPermission('roles.read');
 
@@ -47,7 +50,7 @@ const AppContent: React.FC = () => {
             <div className="text-sm font-semibold tracking-tight text-white flex items-center gap-2">
               CorePanel
               <span className="text-[10px] font-mono px-1.5 py-0.2 bg-neutral-800 text-neutral-400 border border-neutral-700 rounded">
-                v0.1.0-phase2
+                v0.1.0-phase3
               </span>
             </div>
           </div>
@@ -89,6 +92,21 @@ const AppContent: React.FC = () => {
             Navigation
           </div>
           <nav className="space-y-1">
+            {canReadSystem && (
+              <button
+                id="nav-system-btn"
+                onClick={() => setActiveTab('system')}
+                className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  activeTab === 'system'
+                    ? 'bg-neutral-800 text-white shadow-xs'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-850'
+                }`}
+              >
+                <Cpu className="w-4 h-4 text-neutral-400" />
+                <span>System Monitor</span>
+              </button>
+            )}
+
             <button
               id="nav-overview-btn"
               onClick={() => setActiveTab('overview')}
@@ -98,7 +116,7 @@ const AppContent: React.FC = () => {
                   : 'text-neutral-400 hover:text-white hover:bg-neutral-850'
               }`}
             >
-              <Activity className="w-4 h-4 text-neutral-400" />
+              <Shield className="w-4 h-4 text-neutral-400" />
               <span>Auth &amp; Session</span>
             </button>
 
@@ -141,6 +159,8 @@ const AppContent: React.FC = () => {
 
         {/* Content View */}
         <main className="flex-1 p-6 md:p-8 max-w-6xl">
+          {activeTab === 'system' && canReadSystem && <SystemDashboard />}
+
           {activeTab === 'overview' && (
             <div className="space-y-6">
               <div className="pb-4 border-b border-neutral-800">

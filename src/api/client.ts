@@ -1,4 +1,12 @@
 import { ApiErrorResponse } from '../types/auth';
+import {
+  CPUInfo,
+  DiskMountInfo,
+  MemoryInfo,
+  NetworkInterfaceInfo,
+  SystemIdentity,
+  SystemOverview,
+} from '../types/system';
 
 export class ApiError extends Error {
   code: string;
@@ -117,6 +125,31 @@ export class ApiClient {
 
   async listPermissions() {
     return this.request<any[]>('/permissions', { method: 'GET' });
+  }
+
+  // System Monitoring endpoints (Phase 3)
+  async getSystemOverview(): Promise<SystemOverview> {
+    return this.request<SystemOverview>('/system/overview', { method: 'GET' });
+  }
+
+  async getSystemInfo(): Promise<SystemIdentity> {
+    return this.request<SystemIdentity>('/system/info', { method: 'GET' });
+  }
+
+  async getSystemCpu(): Promise<CPUInfo> {
+    return this.request<CPUInfo>('/system/cpu', { method: 'GET' });
+  }
+
+  async getSystemMemory(): Promise<MemoryInfo> {
+    return this.request<MemoryInfo>('/system/memory', { method: 'GET' });
+  }
+
+  async getSystemDisks(): Promise<DiskMountInfo[]> {
+    return this.request<DiskMountInfo[]>('/system/disks', { method: 'GET' });
+  }
+
+  async getSystemNetwork(): Promise<NetworkInterfaceInfo[]> {
+    return this.request<NetworkInterfaceInfo[]>('/system/network', { method: 'GET' });
   }
 }
 

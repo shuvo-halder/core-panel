@@ -16,13 +16,17 @@ async def list_roles(_: UserRead = Depends(require_permission("roles.read"))) ->
 
 
 @router.post("", response_model=RoleRead, status_code=status.HTTP_201_CREATED)
-async def create_role(payload: RoleCreate, _: UserRead = Depends(require_permission("roles.manage"))) -> RoleRead:
+async def create_role(
+    payload: RoleCreate, _: UserRead = Depends(require_permission("roles.manage"))
+) -> RoleRead:
     """Create a new role with specific permission mappings."""
     return auth_service.create_role(payload)
 
 
 @router.get("/{role_id}", response_model=RoleRead)
-async def get_role(role_id: str, _: UserRead = Depends(require_permission("roles.read"))) -> RoleRead:
+async def get_role(
+    role_id: str, _: UserRead = Depends(require_permission("roles.read"))
+) -> RoleRead:
     """Fetch role details by ID."""
     return auth_service.get_role_by_id(role_id)
 

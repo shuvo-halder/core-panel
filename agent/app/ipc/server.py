@@ -18,7 +18,9 @@ class IPCServer:
         self._server: Optional[asyncio.Server] = None
         self._is_running = False
 
-    async def handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+    async def handle_client(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
         try:
             while not reader.at_eof():
                 line = await reader.readline()
@@ -47,7 +49,7 @@ class IPCServer:
                 version=1,
                 requestId="unknown",
                 success=False,
-                error=IPCError(code="MALFORMED_REQUEST", message="Invalid JSON format")
+                error=IPCError(code="MALFORMED_REQUEST", message="Invalid JSON format"),
             )
 
         # Step 2: Validate Schema
@@ -59,7 +61,9 @@ class IPCServer:
                 version=1,
                 requestId=str(req_id),
                 success=False,
-                error=IPCError(code="VALIDATION_ERROR", message=f"Invalid IPC request schema: {err}")
+                error=IPCError(
+                    code="VALIDATION_ERROR", message=f"Invalid IPC request schema: {err}"
+                ),
             )
 
         # Step 3: Check Supported Protocol Version
@@ -68,34 +72,37 @@ class IPCServer:
                 version=1,
                 requestId=req.requestId,
                 success=False,
-                error=IPCError(code="UNSUPPORTED_VERSION", message=f"Protocol version {req.version} not supported")
+                error=IPCError(
+                    code="UNSUPPORTED_VERSION",
+                    message=f"Protocol version {req.version} not supported",
+                ),
             )
 
         # Step 4: Execute Operation
         if not registry.has_operation(req.operation):
-            logger.warning(f"Security Alert: Unknown operation requested: '{req.operation}' [Req: {req.requestId}]")
+            logger.warning(
+                f"Security Alert: Unknown operation requested: '{req.operation}' [Req: {req.requestId}]"
+            )
             return IPCResponse(
                 version=1,
                 requestId=req.requestId,
                 success=False,
-                error=IPCError(code="OPERATION_UNKNOWN", message=f"Operation '{req.operation}' is not supported or prohibited")
+                error=IPCError(
+                    code="OPERATION_UNKNOWN",
+                    message=f"Operation '{req.operation}' is not supported or prohibited",
+                ),
             )
 
         try:
             result = await registry.execute(req.operation, req.payload)
-            return IPCResponse(
-                version=1,
-                requestId=req.requestId,
-                success=True,
-                data=result
-            )
+            return IPCResponse(version=1, requestId=req.requestId, success=True, data=result)
         except Exception as exc:
             logger.error(f"Operation '{req.operation}' failed: {exc}")
             return IPCResponse(
                 version=1,
                 requestId=req.requestId,
                 success=False,
-                error=IPCError(code="EXECUTION_FAILED", message=str(exc))
+                error=IPCError(code="EXECUTION_FAILED", message=str(exc)),
             )
 
     async def start(self) -> None:
@@ -104,8 +111,7 @@ class IPCServer:
             self.socket_path.unlink()
 
         self._server = await asyncio.start_unix_server(
-            self.handle_client,
-            path=str(self.socket_path)
+            self.handle_client, path=str(self.socket_path)
         )
         # Apply restrictive permissions (0660: rw-rw----)
         try:

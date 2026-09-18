@@ -11,7 +11,14 @@ from backend.app.core.logging import logger
 
 class AppError(Exception):
     """Base application domain exception."""
-    def __init__(self, message: str, code: str = "INTERNAL_ERROR", status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR, details: Optional[Any] = None):
+
+    def __init__(
+        self,
+        message: str,
+        code: str = "INTERNAL_ERROR",
+        status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+        details: Optional[Any] = None,
+    ):
         super().__init__(message)
         self.message = message
         self.code = code
@@ -44,7 +51,9 @@ class ConflictError(AppError):
         super().__init__(message, code=code, status_code=status.HTTP_409_CONFLICT)
 
 
-def format_error_response(code: str, message: str, request_id: str, status_code: int) -> JSONResponse:
+def format_error_response(
+    code: str, message: str, request_id: str, status_code: int
+) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
         content={
@@ -53,28 +62,29 @@ def format_error_response(code: str, message: str, request_id: str, status_code:
                 "code": code,
                 "message": message,
                 "requestId": request_id,
-            }
-        }
+            },
+        },
     )
 
 
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     request_id = getattr(request.state, "request_id", "unknown")
-    logger.warning(
-        f"Domain error {exc.code}: {exc.message}",
-        extra={"request_id": request_id}
-    )
+    logger.warning(f"Domain error {exc.code}: {exc.message}", extra={"request_id": request_id})
     return format_error_response(exc.code, exc.message, request_id, exc.status_code)
 
 
 async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     request_id = getattr(request.state, "request_id", "unknown")
-    error_msg = "; ".join([f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in exc.errors()])
-    logger.info(
-        f"Validation error: {error_msg}",
-        extra={"request_id": request_id}
+    error_msg = "; ".join(
+        [f"{'.'.join(str(loc) for loc in err['loc'])}: {err['msg']}" for err in exc.errors()]
     )
-    return format_error_response("VALIDATION_ERROR", f"Invalid parameters: {error_msg}", request_id, status.HTTP_422_UNPROCESSABLE_ENTITY)
+    logger.info(f"Validation error: {error_msg}", extra={"request_id": request_id})
+    return format_error_response(
+        "VALIDATION_ERROR",
+        f"Invalid parameters: {error_msg}",
+        request_id,
+        status.HTTP_422_UNPROCESSABLE_ENTITY,
+    )
 
 
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
@@ -86,7 +96,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
         404: "NOT_FOUND",
         405: "METHOD_NOT_ALLOWED",
         429: "TOO_MANY_REQUESTS",
-        500: "INTERNAL_SERVER_ERROR"
+        500: "INTERNAL_SERVER_ERROR",
     }
     code = code_map.get(exc.status_code, "HTTP_ERROR")
     return format_error_response(code, str(exc.detail), request_id, exc.status_code)
@@ -95,11 +105,11 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     request_id = getattr(request.state, "request_id", "unknown")
     logger.error(
-        f"Unhandled exception: {str(exc)}",
-        exc_info=True,
-        extra={"request_id": request_id}
+        f"Unhandled exception: {str(exc)}", exc_info=True, extra={"request_id": request_id}
     )
 
     # In production, never expose raw Python exception/traceback
     message = "An unexpected internal server error occurred" if settings.is_production else str(exc)
-    return format_error_response("INTERNAL_SERVER_ERROR", message, request_id, status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return format_error_response(
+        "INTERNAL_SERVER_ERROR", message, request_id, status.HTTP_500_INTERNAL_SERVER_ERROR
+    )

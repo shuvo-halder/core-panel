@@ -7,13 +7,21 @@ from typing import Any, Dict
 
 # Patterns to redact from logs
 SENSITIVE_KEYS = {
-    "password", "password_hash", "token", "access_token", "secret",
-    "secret_key", "authorization", "cookie", "private_key", "ssh_key"
+    "password",
+    "password_hash",
+    "token",
+    "access_token",
+    "secret",
+    "secret_key",
+    "authorization",
+    "cookie",
+    "private_key",
+    "ssh_key",
 }
 
 SENSITIVE_REGEX = re.compile(
     r'(?i)(password|token|secret|authorization|key|cookie)["\']?\s*[:=]\s*["\']?([^"\'\s&]+)',
-    re.IGNORECASE
+    re.IGNORECASE,
 )
 
 
@@ -42,7 +50,7 @@ class StructuredJSONFormatter(logging.Formatter):
 
     def _sanitize_message(self, msg: str) -> str:
         # Redact known sensitive string patterns
-        return SENSITIVE_REGEX.sub(r'\1: [REDACTED]', msg)
+        return SENSITIVE_REGEX.sub(r"\1: [REDACTED]", msg)
 
 
 def setup_logger(name: str = "corepanel") -> logging.Logger:
