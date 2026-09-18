@@ -539,6 +539,51 @@ class Database:
                     (7, "0007_network_permissions", now),
                 )
 
+            # Migration 8: Add packages.read permission and assign to admin and viewer roles (Phase 8)
+            if current_version < 8:
+                logger.info("Applying Migration 0008: Seeding package management permissions")
+                packages_permissions = [
+                    (
+                        "perm_packages_read",
+                        "packages.read",
+                        "View installed package inventory, package details, repositories, and update status",
+                        "packages",
+                        "read",
+                    ),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in packages_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
+
+                # Assign packages.read to admin role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_admin", "perm_packages_read", now),
+                )
+
+                # Assign packages.read to viewer role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_viewer", "perm_packages_read", now),
+                )
+
+                # Record migration 8
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (8, "0008_package_permissions", now),
+                )
+
             conn.commit()
             logger.info("SQLite database initialized successfully in WAL mode.")
 

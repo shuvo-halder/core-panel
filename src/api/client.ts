@@ -4,6 +4,13 @@ import { ServiceMutationResult, ServiceSummary } from '../types/service';
 import { BlockDeviceInfo, FilesystemInfo, StorageOverview } from '../types/storage';
 import { DNSConfigInfo, InterfaceDetailInfo, NetworkOverview, RouteInfo } from '../types/network';
 import {
+  PackageDetails,
+  PackageListResponse,
+  PackageOverview,
+  PackageUpdateInfo,
+  RepositoryInfo,
+} from '../types/packages';
+import {
   CPUInfo,
   DiskMountInfo,
   MemoryInfo,
@@ -270,6 +277,44 @@ export class ApiClient {
 
   async getNetworkDNS(): Promise<DNSConfigInfo> {
     return this.request<DNSConfigInfo>('/network/dns', { method: 'GET' });
+  }
+
+  // Linux Package Management endpoints (Phase 8)
+  async getPackagesOverview(): Promise<PackageOverview> {
+    return this.request<PackageOverview>('/packages/overview', { method: 'GET' });
+  }
+
+  async getPackages(params?: {
+    page?: number;
+    page_size?: number;
+    search?: string;
+    sort?: string;
+    order?: 'asc' | 'desc';
+  }): Promise<PackageListResponse> {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.page_size) query.append('page_size', params.page_size.toString());
+    if (params?.search) query.append('search', params.search);
+    if (params?.sort) query.append('sort', params.sort);
+    if (params?.order) query.append('order', params.order);
+
+    const queryString = query.toString();
+    const endpoint = queryString ? `/packages?${queryString}` : '/packages';
+    return this.request<PackageListResponse>(endpoint, { method: 'GET' });
+  }
+
+  async getPackage(name: string): Promise<PackageDetails> {
+    return this.request<PackageDetails>(`/packages/${encodeURIComponent(name)}`, {
+      method: 'GET',
+    });
+  }
+
+  async getPackageRepositories(): Promise<RepositoryInfo[]> {
+    return this.request<RepositoryInfo[]>('/packages/repositories', { method: 'GET' });
+  }
+
+  async getPackageUpdates(): Promise<PackageUpdateInfo[]> {
+    return this.request<PackageUpdateInfo[]>('/packages/updates', { method: 'GET' });
   }
 }
 

@@ -16,6 +16,7 @@ from backend.app.api.v1.roles import router as roles_router
 from backend.app.api.v1.services import router as services_router
 from backend.app.api.v1.storage import router as storage_router
 from backend.app.api.v1.network import router as network_router
+from backend.app.api.v1.packages import router as packages_router
 from backend.app.api.v1.system import router as system_router
 from backend.app.api.v1.users import router as users_router
 from backend.app.auth.service import auth_service
@@ -110,6 +111,7 @@ def create_application() -> FastAPI:
     app.include_router(processes_router, prefix="/api/v1")
     app.include_router(storage_router, prefix="/api/v1")
     app.include_router(network_router, prefix="/api/v1")
+    app.include_router(packages_router, prefix="/api/v1")
 
     return app
 

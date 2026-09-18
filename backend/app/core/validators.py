@@ -165,3 +165,42 @@ def validate_interface_name(name: Any) -> str:
 
     return clean_name
 
+
+# Linux package name pattern (supports Debian/RPM package names and multiarch specs like libc6:amd64)
+PACKAGE_NAME_PATTERN: Pattern[str] = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9\+\.\:\_\-]*$")
+
+
+def validate_package_name(name: Any) -> str:
+    """
+    Strictly validates a Linux package name.
+    Rejects path traversal, whitespace, slashes, null bytes, shell metacharacters, and oversized strings.
+    Raises BadRequestError on validation failure.
+    """
+    if not isinstance(name, str):
+        raise BadRequestError("Package name must be a string", code="INVALID_PACKAGE_NAME")
+
+    clean_name = name.strip()
+    if not clean_name:
+        raise BadRequestError("Package name cannot be empty", code="INVALID_PACKAGE_NAME")
+
+    if len(clean_name) > 128:
+        raise BadRequestError(
+            f"Package name exceeds maximum limit of 128 characters: '{clean_name}'",
+            code="INVALID_PACKAGE_NAME",
+        )
+
+    if PROHIBITED_CHARS_PATTERN.search(clean_name) or ".." in clean_name or "/" in clean_name or "\\" in clean_name:
+        raise BadRequestError(
+            "Package name contains prohibited characters, slashes, or path traversal",
+            code="INVALID_PACKAGE_NAME",
+        )
+
+    if not PACKAGE_NAME_PATTERN.match(clean_name):
+        raise BadRequestError(
+            f"Invalid package name format: '{clean_name}'",
+            code="INVALID_PACKAGE_NAME",
+        )
+
+    return clean_name
+
+

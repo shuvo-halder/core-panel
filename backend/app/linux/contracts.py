@@ -435,6 +435,121 @@ class ProcessListResult:
     total_pages: int
 
 
+@dataclass(frozen=True)
+class PackageManagerInfo:
+    manager: str  # "apt" | "dpkg" | "rpm" | "dnf" | "yum" | "apk" | "pacman" | "unknown"
+    family: str  # "debian" | "rhel" | "alpine" | "arch" | "unknown"
+    distribution: str
+    version: str
+    architecture: str
+    available: bool
+
+
+@dataclass(frozen=True)
+class PackageInfo:
+    name: str
+    version: str
+    architecture: str
+    status: str  # "installed" | "config-files" | "half-installed" | "unknown"
+    summary: str
+    source: Optional[str] = None
+    installed_size_kb: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class PackageDetails:
+    name: str
+    version: str
+    architecture: str
+    status: str
+    summary: str
+    description: str
+    source: Optional[str] = None
+    section: Optional[str] = None
+    maintainer: Optional[str] = None
+    homepage: Optional[str] = None
+    installed_size_kb: Optional[int] = None
+    dependencies: List[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class RepositoryInfo:
+    name: str
+    type: str  # "deb" | "deb-src" | "rpm" | "unknown"
+    uri: str
+    enabled: bool
+    distribution: Optional[str] = None
+    components: List[str] = field(default_factory=list)
+    source_file: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class PackageUpdateInfo:
+    name: str
+    installed_version: str
+    candidate_version: str
+    repository: Optional[str] = None
+    update_available: bool = True
+    urgency: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class PackageListResult:
+    items: List[PackageInfo]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+@dataclass(frozen=True)
+class PackageOverview:
+    manager: str
+    family: str
+    distribution: str
+    architecture: str
+    installed_package_count: int
+    packages_with_updates: Optional[int] = None
+    repository_count: int = 0
+    manager_available: bool = True
+    update_status_message: Optional[str] = None
+
+
+class IPackageManager(ABC):
+    """Contract for safe, read-only Linux package inventory, status, and repository inspection."""
+
+    @abstractmethod
+    def get_manager_info(self) -> PackageManagerInfo:
+        pass
+
+    @abstractmethod
+    def get_overview(self) -> PackageOverview:
+        pass
+
+    @abstractmethod
+    def list_packages(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+        search: Optional[str] = None,
+        sort_by: str = "name",
+        order: str = "asc",
+    ) -> PackageListResult:
+        pass
+
+    @abstractmethod
+    def get_package_details(self, name: str) -> Optional[PackageDetails]:
+        pass
+
+    @abstractmethod
+    def list_repositories(self) -> List[RepositoryInfo]:
+        pass
+
+    @abstractmethod
+    def list_updates(self) -> List[PackageUpdateInfo]:
+        pass
+
+
 class IProcessCollector(ABC):
     """Contract for safe, unprivileged Linux process discovery and metrics collection."""
 
