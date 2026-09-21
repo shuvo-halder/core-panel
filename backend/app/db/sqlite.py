@@ -584,6 +584,79 @@ class Database:
                     (8, "0008_package_permissions", now),
                 )
 
+            # Migration 9: Cron / Scheduled Jobs RBAC Permissions (Phase 9)
+            cursor.execute("SELECT version FROM schema_migrations WHERE version = 9")
+            if not cursor.fetchone():
+                logger.info("Applying migration 0009_cron_permissions...")
+                cron_permissions = [
+                    (
+                        "perm_cron_read",
+                        "cron.read",
+                        "View scheduled cron jobs across system and user crontabs",
+                        "cron",
+                        "read",
+                    ),
+                    (
+                        "perm_cron_create",
+                        "cron.create",
+                        "Create scheduled cron jobs",
+                        "cron",
+                        "create",
+                    ),
+                    (
+                        "perm_cron_update",
+                        "cron.update",
+                        "Update scheduled cron jobs",
+                        "cron",
+                        "update",
+                    ),
+                    (
+                        "perm_cron_delete",
+                        "cron.delete",
+                        "Delete scheduled cron jobs",
+                        "cron",
+                        "delete",
+                    ),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in cron_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
+
+                # Assign all cron permissions to admin role
+                for p_id in (
+                    "perm_cron_read",
+                    "perm_cron_create",
+                    "perm_cron_update",
+                    "perm_cron_delete",
+                ):
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                        VALUES (?, ?, ?)
+                    """,
+                        ("role_admin", p_id, now),
+                    )
+
+                # Assign read-only cron permission to viewer role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_viewer", "perm_cron_read", now),
+                )
+
+                # Record migration 9
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (9, "0009_cron_permissions", now),
+                )
+
             conn.commit()
             logger.info("SQLite database initialized successfully in WAL mode.")
 

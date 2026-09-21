@@ -2,6 +2,12 @@ import os
 import platform
 from typing import Any, Awaitable, Callable, Dict
 
+from agent.app.operations.cron import (
+    handle_cron_create,
+    handle_cron_delete,
+    handle_cron_list,
+    handle_cron_update,
+)
 from agent.app.operations.processes import (
     kill_process_operation,
     terminate_process_operation,
@@ -61,6 +67,12 @@ class OperationRegistry:
         # Allowlisted Process Management Operations (Phase 5)
         self.register("process.terminate", terminate_process_operation)
         self.register("process.kill", kill_process_operation)
+
+        # Allowlisted Scheduled Jobs / Cron Operations (Phase 9)
+        self.register("cron.list", handle_cron_list)
+        self.register("cron.create", handle_cron_create)
+        self.register("cron.update", handle_cron_update)
+        self.register("cron.delete", handle_cron_delete)
 
 
 registry = OperationRegistry()

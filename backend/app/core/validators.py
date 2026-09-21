@@ -204,3 +204,213 @@ def validate_package_name(name: Any) -> str:
     return clean_name
 
 
+# Linux username pattern (POSIX standards, up to 32 characters)
+CRON_USER_PATTERN: Pattern[str] = re.compile(r"^[a-zA-Z0-9_.][a-zA-Z0-9_.-]*$")
+SPECIAL_CRON_EXPRESSIONS: Set[str] = {
+    "@reboot",
+    "@hourly",
+    "@daily",
+    "@midnight",
+    "@weekly",
+    "@monthly",
+    "@yearly",
+    "@annually",
+}
+MONTH_NAMES = {
+    "JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+    "JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12
+}
+DOW_NAMES = {
+    "SUN": 0, "MON": 1, "TUE": 2, "WED": 3, "THU": 4, "FRI": 5, "SAT": 6
+}
+
+
+def validate_cron_username(username: Any, verify_local_account: bool = True) -> str:
+    """
+    Strictly validates an OS username intended for crontab ownership.
+    Rejects path traversal, whitespace, slashes, null bytes, shell characters, and non-existent OS users.
+    """
+    if not isinstance(username, str):
+        raise BadRequestError("Username must be a string", code="INVALID_CRON_USER")
+
+    clean_user = username.strip()
+    if not clean_user:
+        raise BadRequestError("Username cannot be empty", code="INVALID_CRON_USER")
+
+    if len(clean_user) > 32:
+        raise BadRequestError(
+            f"Username exceeds maximum Linux username length (32 chars): '{clean_user}'",
+            code="INVALID_CRON_USER",
+        )
+
+    if PROHIBITED_CHARS_PATTERN.search(clean_user) or ".." in clean_user or "/" in clean_user or "\\" in clean_user:
+        raise BadRequestError(
+            "Username contains prohibited characters, slashes, or path traversal",
+            code="INVALID_CRON_USER",
+        )
+
+    if not CRON_USER_PATTERN.match(clean_user):
+        raise BadRequestError(
+            f"Invalid Linux username format: '{clean_user}'",
+            code="INVALID_CRON_USER",
+        )
+
+    if verify_local_account:
+        try:
+            import pwd
+            pwd.getpwnam(clean_user)
+        except (KeyError, ModuleNotFoundError):
+            raise BadRequestError(
+                f"User '{clean_user}' does not exist as a local operating system account",
+                code="CRON_USER_NOT_FOUND",
+            )
+
+    return clean_user
+
+
+def _validate_cron_field(field_val: str, min_val: int, max_val: int, name_map: Optional[dict] = None) -> None:
+    """Helper to validate an individual 5-field cron schedule component."""
+    if not field_val:
+        raise BadRequestError("Cron field cannot be empty", code="INVALID_CRON_SCHEDULE")
+
+    # Split by comma for lists (e.g. 1,5,10)
+    subfields = field_val.split(",")
+    for sub in subfields:
+        sub = sub.strip()
+        if not sub:
+            raise BadRequestError("Invalid empty list entry in cron field", code="INVALID_CRON_SCHEDULE")
+
+        step = None
+        if "/" in sub:
+            parts = sub.split("/")
+            if len(parts) != 2:
+                raise BadRequestError(f"Invalid step expression '{sub}'", code="INVALID_CRON_SCHEDULE")
+            base, step_str = parts[0], parts[1]
+            if not step_str.isdigit() or int(step_str) <= 0:
+                raise BadRequestError(f"Step value must be a positive integer: '{step_str}'", code="INVALID_CRON_SCHEDULE")
+            sub = base
+
+        if sub == "*":
+            continue
+
+        if "-" in sub:
+            parts = sub.split("-")
+            if len(parts) != 2:
+                raise BadRequestError(f"Invalid range expression '{sub}'", code="INVALID_CRON_SCHEDULE")
+            start_str, end_str = parts[0].upper(), parts[1].upper()
+
+            # Resolve named aliases if available
+            start_num = name_map.get(start_str) if name_map and start_str in name_map else (int(start_str) if start_str.isdigit() else None)
+            end_num = name_map.get(end_str) if name_map and end_str in name_map else (int(end_str) if end_str.isdigit() else None)
+
+            if start_num is None or end_num is None:
+                raise BadRequestError(f"Invalid range boundaries '{sub}'", code="INVALID_CRON_SCHEDULE")
+            if start_num < min_val or start_num > max_val or end_num < min_val or end_num > max_val:
+                raise BadRequestError(f"Range '{sub}' out of bounds ({min_val}-{max_val})", code="INVALID_CRON_SCHEDULE")
+            if start_num > end_num and max_val != 7:  # DOW 7 or wraps can vary, but standard range start <= end
+                raise BadRequestError(f"Range start cannot exceed end: '{sub}'", code="INVALID_CRON_SCHEDULE")
+        else:
+            val_str = sub.upper()
+            val_num = name_map.get(val_str) if name_map and val_str in name_map else (int(val_str) if val_str.isdigit() else None)
+            if val_num is None:
+                raise BadRequestError(f"Invalid token '{sub}' in cron field", code="INVALID_CRON_SCHEDULE")
+            if val_num < min_val or val_num > max_val:
+                raise BadRequestError(f"Value '{sub}' out of bounds ({min_val}-{max_val})", code="INVALID_CRON_SCHEDULE")
+
+
+def validate_cron_schedule(schedule: Any) -> str:
+    """
+    Validates a cron schedule string.
+    Supports either standard 5-field cron or recognized special expressions (@reboot, @daily, etc.).
+    """
+    if not isinstance(schedule, str):
+        raise BadRequestError("Cron schedule must be a string", code="INVALID_CRON_SCHEDULE")
+
+    clean = schedule.strip()
+    if not clean:
+        raise BadRequestError("Cron schedule cannot be empty", code="INVALID_CRON_SCHEDULE")
+
+    if clean.startswith("@"):
+        lower = clean.lower()
+        if lower not in SPECIAL_CRON_EXPRESSIONS:
+            raise BadRequestError(
+                f"Unsupported special cron expression: '{clean}'. Supported: {', '.join(sorted(SPECIAL_CRON_EXPRESSIONS))}",
+                code="INVALID_CRON_SCHEDULE",
+            )
+        return lower
+
+    fields = clean.split()
+    if len(fields) != 5:
+        raise BadRequestError(
+            f"Cron schedule must consist of exactly 5 fields (minute hour day_of_month month day_of_week), got {len(fields)}",
+            code="INVALID_CRON_SCHEDULE",
+        )
+
+    # 1. Minute (0-59)
+    _validate_cron_field(fields[0], 0, 59)
+    # 2. Hour (0-23)
+    _validate_cron_field(fields[1], 0, 23)
+    # 3. Day of month (1-31)
+    _validate_cron_field(fields[2], 1, 31)
+    # 4. Month (1-12 or JAN-DEC)
+    _validate_cron_field(fields[3], 1, 12, MONTH_NAMES)
+    # 5. Day of week (0-7, 0 & 7 = Sunday, or SUN-SAT)
+    _validate_cron_field(fields[4], 0, 7, DOW_NAMES)
+
+    return " ".join(fields)
+
+
+def validate_cron_command(command: Any) -> str:
+    """
+    Validates a cron command string.
+    Treated strictly as stored crontab data — NEVER executed by the control plane.
+    Rejects null bytes, unescaped raw newlines (to prevent crontab record framing injection),
+    and enforces maximum length bounds.
+    """
+    if not isinstance(command, str):
+        raise BadRequestError("Cron command must be a string", code="INVALID_CRON_COMMAND")
+
+    clean = command.strip()
+    if not clean:
+        raise BadRequestError("Cron command cannot be empty", code="INVALID_CRON_COMMAND")
+
+    if len(clean) > 2048:
+        raise BadRequestError(
+            f"Cron command exceeds maximum length of 2048 characters (got {len(clean)})",
+            code="INVALID_CRON_COMMAND",
+        )
+
+    if "\x00" in clean:
+        raise BadRequestError("Cron command contains illegal null bytes", code="INVALID_CRON_COMMAND")
+
+    if "\n" in clean or "\r" in clean:
+        raise BadRequestError("Cron command cannot contain unescaped newline or carriage return characters", code="INVALID_CRON_COMMAND")
+
+    return clean
+
+
+def validate_cron_comment(comment: Any) -> Optional[str]:
+    """Validates an optional human-readable descriptive comment attached to a cron entry."""
+    if comment is None:
+        return None
+
+    if not isinstance(comment, str):
+        raise BadRequestError("Cron comment must be a string", code="INVALID_CRON_COMMENT")
+
+    clean = comment.strip()
+    if not clean:
+        return None
+
+    if len(clean) > 512:
+        raise BadRequestError(
+            f"Cron comment exceeds maximum length of 512 characters (got {len(clean)})",
+            code="INVALID_CRON_COMMENT",
+        )
+
+    if "\x00" in clean or "\n" in clean or "\r" in clean:
+        raise BadRequestError("Cron comment cannot contain null bytes or newline characters", code="INVALID_CRON_COMMENT")
+
+    return clean
+
+
+

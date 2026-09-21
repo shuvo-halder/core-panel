@@ -11,6 +11,16 @@ import {
   RepositoryInfo,
 } from '../types/packages';
 import {
+  CronEligibleUser,
+  CronJob,
+  CronJobCreateRequest,
+  CronJobDeleteResult,
+  CronJobMutationResult,
+  CronJobUpdateRequest,
+  CronListResponse,
+  CronOverview,
+} from '../types/cron';
+import {
   CPUInfo,
   DiskMountInfo,
   MemoryInfo,
@@ -315,6 +325,62 @@ export class ApiClient {
 
   async getPackageUpdates(): Promise<PackageUpdateInfo[]> {
     return this.request<PackageUpdateInfo[]>('/packages/updates', { method: 'GET' });
+  }
+
+  // Scheduled Jobs / Cron Management endpoints (Phase 9)
+  async getCronOverview(): Promise<CronOverview> {
+    return this.request<CronOverview>('/cron/overview', { method: 'GET' });
+  }
+
+  async getCronJobs(params?: {
+    page?: number;
+    page_size?: number;
+    owner?: string;
+    source?: string;
+    enabled?: boolean;
+    search?: string;
+  }): Promise<CronListResponse> {
+    const query = new URLSearchParams();
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.page_size) query.append('page_size', params.page_size.toString());
+    if (params?.owner) query.append('owner', params.owner);
+    if (params?.source) query.append('source', params.source);
+    if (params?.enabled !== undefined) query.append('enabled', String(params.enabled));
+    if (params?.search) query.append('search', params.search);
+
+    const queryString = query.toString();
+    const endpoint = queryString ? `/cron/jobs?${queryString}` : '/cron/jobs';
+    return this.request<CronListResponse>(endpoint, { method: 'GET' });
+  }
+
+  async getCronJob(id: string): Promise<CronJob> {
+    return this.request<CronJob>(`/cron/jobs/${encodeURIComponent(id)}`, { method: 'GET' });
+  }
+
+  async getCronUsers(): Promise<CronEligibleUser[]> {
+    return this.request<CronEligibleUser[]>('/cron/users', { method: 'GET' });
+  }
+
+  async createCronJob(data: CronJobCreateRequest): Promise<CronJobMutationResult> {
+    return this.request<CronJobMutationResult>('/cron/jobs', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateCronJob(id: string, data: CronJobUpdateRequest): Promise<CronJobMutationResult> {
+    return this.request<CronJobMutationResult>(`/cron/jobs/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteCronJob(id: string, owner: string, expectedHash?: string): Promise<CronJobDeleteResult> {
+    const query = new URLSearchParams({ owner });
+    if (expectedHash) query.append('expected_hash', expectedHash);
+    return this.request<CronJobDeleteResult>(`/cron/jobs/${encodeURIComponent(id)}?${query.toString()}`, {
+      method: 'DELETE',
+    });
   }
 }
 

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
@@ -570,11 +570,126 @@ class IProcessCollector(ABC):
 
 
 class IProcessProvider(ABC):
-    """Contract for process monitoring (Pending Phase 9)."""
+    """Contract for process monitoring."""
 
     @abstractmethod
     async def list_processes(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """Pending Phase 9 implementation."""
+        pass
+
+
+class CronSource:
+    """Linux cron source identifiers."""
+
+    USER_CRONTAB = "USER_CRONTAB"
+    SYSTEM_CRONTAB = "SYSTEM_CRONTAB"
+    CRON_D_DIRECTORY = "CRON_D_DIRECTORY"
+    PERIODIC_DIRECTORY = "PERIODIC_DIRECTORY"
+
+
+@dataclass(frozen=True)
+class CronJob:
+    """Structured Linux cron job representation."""
+
+    id: str
+    owner: str
+    schedule: str
+    minute: str
+    hour: str
+    day_of_month: str
+    month: str
+    day_of_week: str
+    command: str
+    enabled: bool
+    source: str
+    special_expression: Optional[str] = None
+    comment: Optional[str] = None
+    source_file: Optional[str] = None
+    line_number: Optional[int] = None
+    description: Optional[str] = None
+    is_editable: bool = True
+    original_hash: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class CronListResult:
+    """Paginated cron job query result."""
+
+    items: List[CronJob]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+@dataclass(frozen=True)
+class CronOverview:
+    """High-level metrics for scheduled cron jobs across the Linux host."""
+
+    total_jobs: int
+    active_jobs: int
+    disabled_jobs: int
+    users_with_crontabs: int
+    user_jobs_count: int
+    system_jobs_count: int
+    cron_d_jobs_count: int
+    periodic_jobs_count: int
+    available_sources: List[str]
+
+
+class ICronManager(ABC):
+    """Contract for safe Linux cron inspection and user crontab management."""
+
+    @abstractmethod
+    async def get_overview(self) -> CronOverview:
+        pass
+
+    @abstractmethod
+    async def list_jobs(
+        self,
+        page: int = 1,
+        page_size: int = 50,
+        owner: Optional[str] = None,
+        source: Optional[str] = None,
+        enabled: Optional[bool] = None,
+        search: Optional[str] = None,
+    ) -> CronListResult:
+        pass
+
+    @abstractmethod
+    async def get_job(self, job_id: str) -> Optional[CronJob]:
+        pass
+
+    @abstractmethod
+    async def create_job(
+        self,
+        owner: str,
+        schedule: str,
+        command: str,
+        comment: Optional[str] = None,
+        enabled: bool = True,
+    ) -> CronJob:
+        pass
+
+    @abstractmethod
+    async def update_job(
+        self,
+        job_id: str,
+        owner: str,
+        schedule: str,
+        command: str,
+        comment: Optional[str] = None,
+        enabled: bool = True,
+        expected_hash: Optional[str] = None,
+    ) -> CronJob:
+        pass
+
+    @abstractmethod
+    async def delete_job(
+        self,
+        job_id: str,
+        owner: str,
+        expected_hash: Optional[str] = None,
+    ) -> bool:
         pass
 
 

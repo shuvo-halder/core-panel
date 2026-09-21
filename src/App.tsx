@@ -9,6 +9,7 @@ import { ProcessManagement } from './components/ProcessManagement';
 import { StorageManagement } from './components/StorageManagement';
 import { NetworkManagement } from './components/NetworkManagement';
 import { PackageManagement } from './components/PackageManagement';
+import { CronManagement } from './components/CronManagement';
 import {
   Shield,
   Users,
@@ -23,11 +24,12 @@ import {
   HardDrive,
   Radio,
   Package,
+  Clock,
 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { user, permissions, isAuthenticated, isLoading, logout, hasPermission } = useAuth();
-  const [activeTab, setActiveTab] = useState<'system' | 'services' | 'processes' | 'storage' | 'network' | 'packages' | 'overview' | 'users' | 'roles'>('system');
+  const [activeTab, setActiveTab] = useState<'system' | 'services' | 'processes' | 'storage' | 'network' | 'packages' | 'cron' | 'overview' | 'users' | 'roles'>('system');
 
   if (isLoading) {
     return (
@@ -48,6 +50,7 @@ const AppContent: React.FC = () => {
   const canReadStorage = hasPermission('storage.read');
   const canReadNetwork = hasPermission('network.read');
   const canReadPackages = hasPermission('packages.read');
+  const canReadCron = hasPermission('cron.read');
   const canReadUsers = hasPermission('users.read');
   const canReadRoles = hasPermission('roles.read');
 
@@ -195,6 +198,21 @@ const AppContent: React.FC = () => {
               </button>
             )}
 
+            {canReadCron && (
+              <button
+                id="nav-cron-btn"
+                onClick={() => setActiveTab('cron')}
+                className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  activeTab === 'cron'
+                    ? 'bg-neutral-800 text-white shadow-xs'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-850'
+                }`}
+              >
+                <Clock className="w-4 h-4 text-neutral-400" />
+                <span>Cron Jobs</span>
+              </button>
+            )}
+
             <button
               id="nav-overview-btn"
               onClick={() => setActiveTab('overview')}
@@ -253,6 +271,7 @@ const AppContent: React.FC = () => {
           {activeTab === 'storage' && canReadStorage && <StorageManagement />}
           {activeTab === 'network' && canReadNetwork && <NetworkManagement />}
           {activeTab === 'packages' && canReadPackages && <PackageManagement />}
+          {activeTab === 'cron' && canReadCron && <CronManagement />}
 
           {activeTab === 'overview' && (
             <div className="space-y-6">
