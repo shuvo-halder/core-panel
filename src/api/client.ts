@@ -30,6 +30,14 @@ import {
   LogSource,
 } from '../types/logs';
 import {
+  ConfigValidationResult,
+  NginxOverview,
+  ReloadResult,
+  SiteConfig,
+  SiteCreateInput,
+  SiteUpdateInput,
+} from '../types/webserver';
+import {
   CPUInfo,
   DiskMountInfo,
   MemoryInfo,
@@ -445,6 +453,67 @@ export class ApiClient {
     const qs = query.toString();
     const endpoint = qs ? `/logs/audit?${qs}` : '/logs/audit';
     return this.request<AuditLogPage>(endpoint, { method: 'GET' });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Web Server & Reverse Proxy Management (Phase 11)
+  // ---------------------------------------------------------------------------
+
+  async getWebserverOverview(): Promise<NginxOverview> {
+    return this.request<NginxOverview>('/webserver/overview', { method: 'GET' });
+  }
+
+  async listWebserverSites(): Promise<SiteConfig[]> {
+    return this.request<SiteConfig[]>('/webserver/sites', { method: 'GET' });
+  }
+
+  async getWebserverSite(name: string): Promise<SiteConfig> {
+    return this.request<SiteConfig>(`/webserver/sites/${encodeURIComponent(name)}`, { method: 'GET' });
+  }
+
+  async createWebserverSite(site: SiteCreateInput): Promise<SiteConfig> {
+    return this.request<SiteConfig>('/webserver/sites', {
+      method: 'POST',
+      body: JSON.stringify(site),
+    });
+  }
+
+  async updateWebserverSite(name: string, site: SiteUpdateInput): Promise<SiteConfig> {
+    return this.request<SiteConfig>(`/webserver/sites/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      body: JSON.stringify(site),
+    });
+  }
+
+  async deleteWebserverSite(name: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/webserver/sites/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async enableWebserverSite(name: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/webserver/sites/${encodeURIComponent(name)}/enable`, {
+      method: 'POST',
+    });
+  }
+
+  async disableWebserverSite(name: string): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>(`/webserver/sites/${encodeURIComponent(name)}/disable`, {
+      method: 'POST',
+    });
+  }
+
+  async validateWebserverCandidate(site: SiteCreateInput): Promise<ConfigValidationResult> {
+    return this.request<ConfigValidationResult>('/webserver/validate', {
+      method: 'POST',
+      body: JSON.stringify(site),
+    });
+  }
+
+  async reloadWebserver(): Promise<ReloadResult> {
+    return this.request<ReloadResult>('/webserver/reload', {
+      method: 'POST',
+    });
   }
 }
 

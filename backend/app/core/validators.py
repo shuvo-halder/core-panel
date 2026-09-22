@@ -1,6 +1,6 @@
 import os
 import re
-from typing import Any, Optional, Pattern, Set
+from typing import Any, List, Optional, Pattern, Set, Tuple
 
 from backend.app.core.errors import BadRequestError, ForbiddenError
 
@@ -611,6 +611,377 @@ def validate_log_timestamp(ts: Any, param_name: str = "timestamp") -> Optional[s
         )
 
     return clean
+
+
+# -----------------------------------------------------------------------------
+# Phase 11: Web Server & Nginx Virtual Host Validators
+# -----------------------------------------------------------------------------
+
+SITE_NAME_PATTERN: Pattern[str] = re.compile(
+    r"^[a-zA-Z0-9]([a-zA-Z0-9_\-\.]{0,251}[a-zA-Z0-9])?$"
+)
+
+DOMAIN_NAME_PATTERN: Pattern[str] = re.compile(
+    r"^(\*\.)?([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$|^[a-zA-Z0-9\-]{1,63}$|^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$"
+)
+
+PROXY_TARGET_PATTERN: Pattern[str] = re.compile(
+    r"^https?://([a-zA-Z0-9\.\-]+|\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})(:\d{1,5})?(/[\w\-\./]*)?$"
+)
+
+BODY_SIZE_PATTERN: Pattern[str] = re.compile(r"^\d+[kmgKMG]?$")
+
+ALLOWED_SYSTEM_WEB_ROOT_PREFIXES = (
+    "/var/www",
+    "/srv/www",
+    "/usr/share/nginx/html",
+)
+
+ALLOWED_HOME_PUBLIC_SUBDIRS = frozenset({
+    "public_html",
+    "www",
+    "htdocs",
+})
+
+# Backward compatibility alias
+ALLOWED_WEB_ROOT_PREFIXES = (
+    "/var/www",
+    "/srv/www",
+    "/usr/share/nginx/html",
+    "/home/<user>/{public_html,www,htdocs}",
+)
+
+DISALLOWED_ROOT_PATHS = frozenset({
+    "/",
+    "/etc",
+    "/root",
+    "/proc",
+    "/sys",
+    "/dev",
+    "/run",
+    "/boot",
+    "/bin",
+    "/sbin",
+    "/usr",
+    "/lib",
+    "/lib64",
+    "/var",
+    "/srv",
+    "/tmp",
+})
+
+DISALLOWED_ROOT_PREFIXES = (
+    "/etc",
+    "/root",
+    "/proc",
+    "/sys",
+    "/dev",
+    "/run",
+    "/boot",
+    "/bin",
+    "/sbin",
+    "/lib",
+    "/lib64",
+    "/tmp",
+    "/var/log",
+    "/var/run",
+    "/var/lib",
+    "/var/cache",
+    "/var/backups",
+)
+
+ALLOWED_SSL_PREFIXES = (
+    "/etc/ssl",
+    "/etc/nginx/ssl",
+    "/etc/letsencrypt/live",
+    "/etc/pki",
+)
+
+
+def validate_site_name(name: Any) -> str:
+    """
+    Strictly validates a site identifier.
+    Rejects path traversal, slashes, null bytes, shell metacharacters, whitespace,
+    leading dashes, and names exceeding 253 characters.
+    """
+    if not isinstance(name, str):
+        raise BadRequestError("Site name must be a string", code="INVALID_SITE_NAME")
+
+    clean = name.strip().lower()
+    if not clean:
+        raise BadRequestError("Site name cannot be empty", code="INVALID_SITE_NAME")
+
+    if len(clean) > 253:
+        raise BadRequestError(
+            f"Site name exceeds maximum length of 253 characters (got {len(clean)})",
+            code="INVALID_SITE_NAME",
+        )
+
+    if "/" in clean or "\\" in clean or ".." in clean or clean.startswith("-") or clean.startswith("."):
+        raise BadRequestError(
+            "Site name cannot contain slashes, path traversal, or leading dots/dashes",
+            code="INVALID_SITE_NAME",
+        )
+
+    if PROHIBITED_CHARS_PATTERN.search(clean) or any(c in clean for c in " \t\r\n`'\"$<>|&;{}()[]"):
+        raise BadRequestError(
+            "Site name contains illegal or shell metacharacters",
+            code="INVALID_SITE_NAME",
+        )
+
+    if not SITE_NAME_PATTERN.match(clean):
+        raise BadRequestError(
+            f"Invalid site name format: '{clean}'. Must be a valid domain or alphanumeric slug.",
+            code="INVALID_SITE_NAME",
+        )
+
+    return clean
+
+
+def validate_server_names(names: Any) -> List[str]:
+    """
+    Validates a list of server domains/hostnames for an Nginx virtual host.
+    Rejects shell metacharacters, whitespace, quotes, and invalid domain formats.
+    """
+    if not names:
+        raise BadRequestError("At least one server name / domain is required", code="INVALID_SERVER_NAMES")
+
+    if isinstance(names, str):
+        raw_list = [n.strip() for n in names.split() if n.strip()]
+    elif isinstance(names, (list, tuple)):
+        raw_list = [str(n).strip() for n in names if str(n).strip()]
+    else:
+        raise BadRequestError("Server names must be a list or space-separated string", code="INVALID_SERVER_NAMES")
+
+    if not raw_list:
+        raise BadRequestError("At least one server name / domain is required", code="INVALID_SERVER_NAMES")
+
+    if len(raw_list) > 32:
+        raise BadRequestError("A maximum of 32 server names is allowed per site", code="INVALID_SERVER_NAMES")
+
+    validated: List[str] = []
+    seen: Set[str] = set()
+
+    for item in raw_list:
+        lower_item = item.lower()
+        if len(lower_item) > 253:
+            raise BadRequestError(f"Server name '{item}' exceeds 253 characters", code="INVALID_SERVER_NAMES")
+
+        if any(c in lower_item for c in " \t\r\n`'\"$<>|&;{}()[]/\\"):
+            raise BadRequestError(
+                f"Server name '{item}' contains prohibited characters or shell metacharacters",
+                code="INVALID_SERVER_NAMES",
+            )
+
+        if lower_item == "_" or DOMAIN_NAME_PATTERN.match(lower_item):
+            if lower_item not in seen:
+                seen.add(lower_item)
+                validated.append(lower_item)
+        else:
+            raise BadRequestError(
+                f"Invalid domain name format: '{item}'",
+                code="INVALID_SERVER_NAMES",
+            )
+
+    return validated
+
+
+def validate_listen_port(port: Any) -> int:
+    """Validates an HTTP/HTTPS port number between 1 and 65535."""
+    try:
+        p = int(port)
+    except (ValueError, TypeError):
+        raise BadRequestError(f"Listen port must be an integer (got {port})", code="INVALID_LISTEN_PORT")
+
+    if p < 1 or p > 65535:
+        raise BadRequestError(f"Listen port {p} out of range (1-65535)", code="INVALID_LISTEN_PORT")
+
+    return p
+
+
+def validate_web_root(path: Any) -> Optional[str]:
+    """
+    Validates document root filesystem path.
+    Requires absolute path under allowed web directories (/var/www, /srv/www, etc.).
+    Rejects path traversal, null bytes, and sensitive system directories.
+    """
+    if path is None:
+        return None
+
+    if not isinstance(path, str):
+        raise BadRequestError("Document root must be a string path", code="INVALID_WEB_ROOT")
+
+    clean = path.strip()
+    if not clean:
+        return None
+
+    if "\x00" in clean or "\n" in clean or "\r" in clean:
+        raise BadRequestError("Document root contains illegal null bytes or newlines", code="INVALID_WEB_ROOT")
+
+    if not clean.startswith("/"):
+        raise BadRequestError(
+            f"Document root must be an absolute path: '{clean}'",
+            code="INVALID_WEB_ROOT",
+        )
+
+    if ".." in clean:
+        raise BadRequestError(
+            "Document root cannot contain path traversal ('..')",
+            code="INVALID_WEB_ROOT",
+        )
+
+    normalized = os.path.normpath(clean)
+
+    if normalized in DISALLOWED_ROOT_PATHS or any(
+        normalized == dp or normalized.startswith(f"{dp}/") for dp in DISALLOWED_ROOT_PREFIXES
+    ):
+        raise BadRequestError(
+            f"Document root cannot reside in sensitive system directory: '{normalized}'",
+            code="INVALID_WEB_ROOT",
+        )
+
+    # Path policy enforcement
+    if normalized == "/home" or normalized.startswith("/home/"):
+        # Strict /home public web-root policy:
+        # 1. Absolute path under /home/<user>/...
+        # 2. Must target an approved public subdirectory: public_html, www, or htdocs
+        # 3. Disallow raw user homes (/home, /home/user) and sensitive directories (.ssh, .gnupg, .config)
+        # 4. Disallow hidden directory components anywhere in the path
+        parts = [p for p in normalized.split("/") if p]
+        if len(parts) < 3:
+            raise BadRequestError(
+                "Document root under /home must be located in an approved public directory (/home/<user>/public_html, /home/<user>/www, /home/<user>/htdocs)",
+                code="INVALID_WEB_ROOT",
+            )
+
+        username = parts[1]
+        if not re.match(r"^[a-zA-Z0-9_\-]+$", username) or username.startswith("."):
+            raise BadRequestError(
+                f"Invalid user account format in home path: '{username}'",
+                code="INVALID_WEB_ROOT",
+            )
+
+        if any(part.startswith(".") for part in parts):
+            raise BadRequestError(
+                "Document root cannot contain hidden directory components (e.g. .ssh, .config)",
+                code="INVALID_WEB_ROOT",
+            )
+
+        public_sub = parts[2]
+        if public_sub not in ALLOWED_HOME_PUBLIC_SUBDIRS:
+            raise BadRequestError(
+                f"Document root under /home must reside in an approved public directory ({', '.join(sorted(ALLOWED_HOME_PUBLIC_SUBDIRS))}): got '{public_sub}'",
+                code="INVALID_WEB_ROOT",
+            )
+    else:
+        if not any(
+            normalized == prefix or normalized.startswith(f"{prefix}/")
+            for prefix in ALLOWED_SYSTEM_WEB_ROOT_PREFIXES
+        ):
+            approved_display = list(ALLOWED_SYSTEM_WEB_ROOT_PREFIXES) + ["/home/<user>/{public_html,www,htdocs}"]
+            raise BadRequestError(
+                f"Document root must reside under an approved web directory ({', '.join(approved_display)}): '{normalized}'",
+                code="INVALID_WEB_ROOT",
+            )
+
+        parts = [p for p in normalized.split("/") if p]
+        if any(part.startswith(".") for part in parts):
+            raise BadRequestError(
+                "Document root cannot contain hidden directory components",
+                code="INVALID_WEB_ROOT",
+            )
+
+    return normalized
+
+
+def validate_proxy_target(target: Any) -> Optional[str]:
+    """
+    Validates an HTTP/HTTPS reverse proxy upstream target URL.
+    Rejects arbitrary directives, newlines, and unapproved schemes.
+    """
+    if target is None:
+        return None
+
+    if not isinstance(target, str):
+        raise BadRequestError("Proxy target must be a string URL", code="INVALID_PROXY_TARGET")
+
+    clean = target.strip()
+    if not clean:
+        return None
+
+    if len(clean) > 255:
+        raise BadRequestError("Proxy target URL exceeds 255 characters", code="INVALID_PROXY_TARGET")
+
+    if any(c in clean for c in " \t\r\n`'\"$<>|&;{}()[]"):
+        raise BadRequestError(
+            "Proxy target contains prohibited characters or directives",
+            code="INVALID_PROXY_TARGET",
+        )
+
+    if not PROXY_TARGET_PATTERN.match(clean):
+        raise BadRequestError(
+            f"Invalid proxy target format: '{clean}'. Must be http://host[:port][/path] or https://host[:port][/path]",
+            code="INVALID_PROXY_TARGET",
+        )
+
+    return clean
+
+
+def validate_ssl_paths(cert_path: Any, key_path: Any) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Validates certificate and private key file paths for an SSL-enabled site.
+    Ensures paths reside inside controlled SSL directories (/etc/ssl, /etc/nginx/ssl, /etc/letsencrypt/live).
+    Rejects path traversal, arbitrary file paths, and sensitive system locations.
+    """
+    if not cert_path and not key_path:
+        return None, None
+
+    if bool(cert_path) != bool(key_path):
+        raise BadRequestError(
+            "Both SSL certificate and certificate key must be specified when SSL is enabled",
+            code="INVALID_SSL_CONFIG",
+        )
+
+    c_clean = str(cert_path).strip()
+    k_clean = str(key_path).strip()
+
+    for label, path_val in (("Certificate", c_clean), ("Certificate key", k_clean)):
+        if "\x00" in path_val or "\n" in path_val or "\r" in path_val:
+            raise BadRequestError(f"{label} path contains illegal characters", code="INVALID_SSL_PATH")
+
+        if not path_val.startswith("/"):
+            raise BadRequestError(f"{label} path must be an absolute path: '{path_val}'", code="INVALID_SSL_PATH")
+
+        if ".." in path_val:
+            raise BadRequestError(f"{label} path cannot contain traversal ('..')", code="INVALID_SSL_PATH")
+
+        norm = os.path.normpath(path_val)
+        if not any(norm == prefix or norm.startswith(f"{prefix}/") for prefix in ALLOWED_SSL_PREFIXES):
+            raise BadRequestError(
+                f"{label} path must reside in an approved SSL directory ({', '.join(ALLOWED_SSL_PREFIXES)}): '{norm}'",
+                code="INVALID_SSL_PATH",
+            )
+
+    return os.path.normpath(c_clean), os.path.normpath(k_clean)
+
+
+def validate_client_max_body_size(size: Any) -> str:
+    """Validates client_max_body_size directive (e.g. '10m', '50m', '1g', '0')."""
+    if size is None:
+        return "10m"
+
+    clean = str(size).strip().lower()
+    if not clean:
+        return "10m"
+
+    if not BODY_SIZE_PATTERN.match(clean):
+        raise BadRequestError(
+            f"Invalid client_max_body_size format: '{clean}'. Expected e.g. '10m', '100m', '1g'.",
+            code="INVALID_BODY_SIZE",
+        )
+
+    return clean
+
 
 
 

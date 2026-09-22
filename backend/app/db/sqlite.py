@@ -716,6 +716,95 @@ class Database:
                     (10, "0010_log_permissions", now),
                 )
 
+            # Migration 11: Web Server (Nginx) Permissions (Phase 11)
+            if current_version < 11:
+                now = datetime.now(timezone.utc).isoformat()
+                logger.info("Applying migration 0011_webserver_permissions...")
+                webserver_permissions = [
+                    (
+                        "perm_webserver_read",
+                        "webserver.read",
+                        "View web server status, virtual hosts, and configuration",
+                        "webserver",
+                        "read",
+                    ),
+                    (
+                        "perm_webserver_create",
+                        "webserver.create",
+                        "Create new web server virtual hosts",
+                        "webserver",
+                        "create",
+                    ),
+                    (
+                        "perm_webserver_update",
+                        "webserver.update",
+                        "Update web server virtual hosts",
+                        "webserver",
+                        "update",
+                    ),
+                    (
+                        "perm_webserver_delete",
+                        "webserver.delete",
+                        "Delete managed web server virtual hosts",
+                        "webserver",
+                        "delete",
+                    ),
+                    (
+                        "perm_webserver_enable",
+                        "webserver.enable",
+                        "Enable web server virtual hosts",
+                        "webserver",
+                        "enable",
+                    ),
+                    (
+                        "perm_webserver_disable",
+                        "webserver.disable",
+                        "Disable web server virtual hosts",
+                        "webserver",
+                        "disable",
+                    ),
+                    (
+                        "perm_webserver_reload",
+                        "webserver.reload",
+                        "Reload Nginx web server service",
+                        "webserver",
+                        "reload",
+                    ),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in webserver_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
+
+                # Assign all webserver permissions to admin role
+                for p_id, _, _, _, _ in webserver_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                        VALUES (?, ?, ?)
+                    """,
+                        ("role_admin", p_id, now),
+                    )
+
+                # Assign only webserver.read to viewer role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_viewer", "perm_webserver_read", now),
+                )
+
+                # Record migration 11
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (11, "0011_webserver_permissions", now),
+                )
+
             conn.commit()
             logger.info("SQLite database initialized successfully in WAL mode.")
 

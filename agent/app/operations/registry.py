@@ -12,6 +12,15 @@ from agent.app.operations.logs import (
     handle_logs_file_read,
     handle_logs_journal_read,
 )
+from agent.app.operations.nginx import (
+    handle_nginx_config_validate,
+    handle_nginx_reload,
+    handle_nginx_site_deploy,
+    handle_nginx_site_disable,
+    handle_nginx_site_enable,
+    handle_nginx_site_remove,
+    handle_nginx_status,
+)
 from agent.app.operations.processes import (
     kill_process_operation,
     terminate_process_operation,
@@ -81,6 +90,15 @@ class OperationRegistry:
         # Allowlisted Log Operations (Phase 10)
         self.register("logs.journal.read", handle_logs_journal_read)
         self.register("logs.file.read", handle_logs_file_read)
+
+        # Allowlisted Web Server / Nginx Operations (Phase 11)
+        self.register("nginx.status", handle_nginx_status)
+        self.register("nginx.config_validate", handle_nginx_config_validate)
+        self.register("nginx.site_deploy", handle_nginx_site_deploy)
+        self.register("nginx.site_remove", handle_nginx_site_remove)
+        self.register("nginx.site_enable", handle_nginx_site_enable)
+        self.register("nginx.site_disable", handle_nginx_site_disable)
+        self.register("nginx.reload", handle_nginx_reload)
 
 
 registry = OperationRegistry()

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -838,4 +838,121 @@ class ILogManager(ABC):
         self, entry_id: str, source: Optional[str] = None
     ) -> Optional[LogEntry]:
         pass
+
+
+# -----------------------------------------------------------------------------
+# Phase 11: Web Server & Reverse Proxy Management Contracts
+# -----------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class NginxStatus:
+    """Nginx server status and configuration metadata."""
+
+    installed: bool
+    version: Optional[str] = None
+    executable_path: Optional[str] = None
+    service_active: bool = False
+    config_path: Optional[str] = None
+    sites_available_count: int = 0
+    sites_enabled_count: int = 0
+    config_valid: bool = False
+    config_error: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class SiteProxyConfig:
+    """Reverse proxy settings for an Nginx site."""
+
+    enabled: bool = False
+    target: Optional[str] = None
+    preserve_host: bool = True
+
+
+@dataclass(frozen=True)
+class SiteSSLConfig:
+    """TLS/SSL configuration and status for an Nginx site."""
+
+    enabled: bool = False
+    certificate: Optional[str] = None
+    certificate_key: Optional[str] = None
+    cert_exists: bool = False
+    subject: Optional[str] = None
+    issuer: Optional[str] = None
+    not_after: Optional[str] = None
+    days_remaining: Optional[int] = None
+
+
+@dataclass(frozen=True)
+class SiteConfig:
+    """Structured, safe model representing an Nginx virtual host."""
+
+    name: str
+    server_names: List[str]
+    listen: int = 80
+    listen_ipv6: bool = False
+    root: Optional[str] = None
+    proxy: SiteProxyConfig = field(default_factory=SiteProxyConfig)
+    ssl: SiteSSLConfig = field(default_factory=SiteSSLConfig)
+    access_log: bool = True
+    error_log: bool = True
+    index: List[str] = field(default_factory=lambda: ["index.html", "index.htm"])
+    client_max_body_size: str = "10m"
+    enabled: bool = False
+    managed: bool = True
+    config_path: Optional[str] = None
+
+
+class INginxManager(ABC):
+    """Abstract contract for secure Nginx web server & reverse proxy management."""
+
+    @abstractmethod
+    async def get_status(self) -> NginxStatus:
+        """Detects Nginx binary, service status, and configuration syntax."""
+        pass
+
+    @abstractmethod
+    async def list_sites(self) -> List[SiteConfig]:
+        """Discovers virtual hosts in sites-available and detects enable state."""
+        pass
+
+    @abstractmethod
+    async def get_site(self, name: str) -> Optional[SiteConfig]:
+        """Fetches structured configuration metadata for a single site."""
+        pass
+
+    @abstractmethod
+    async def create_site(self, site: SiteConfig) -> SiteConfig:
+        """Generates, validates, and atomically deploys a new managed site configuration."""
+        pass
+
+    @abstractmethod
+    async def update_site(self, name: str, site: SiteConfig) -> SiteConfig:
+        """Atomically updates an existing managed site configuration with rollback."""
+        pass
+
+    @abstractmethod
+    async def delete_site(self, name: str) -> bool:
+        """Safely removes a managed site configuration and its symlink."""
+        pass
+
+    @abstractmethod
+    async def enable_site(self, name: str) -> bool:
+        """Enables a site via controlled symlink, validates, and reloads Nginx."""
+        pass
+
+    @abstractmethod
+    async def disable_site(self, name: str) -> bool:
+        """Disables a site via controlled symlink removal, validates, and reloads Nginx."""
+        pass
+
+    @abstractmethod
+    async def validate_config(self, site: SiteConfig) -> Tuple[bool, Optional[str]]:
+        """Generates and validates candidate configuration with nginx -t without deploying."""
+        pass
+
+    @abstractmethod
+    async def reload(self) -> Tuple[bool, Optional[str]]:
+        """Safely reloads Nginx service after validating configuration syntax."""
+        pass
+
 

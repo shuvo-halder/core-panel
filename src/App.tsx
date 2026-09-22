@@ -11,6 +11,7 @@ import { NetworkManagement } from './components/NetworkManagement';
 import { PackageManagement } from './components/PackageManagement';
 import { CronManagement } from './components/CronManagement';
 import { LogManagement } from './components/LogManagement';
+import { WebServerManagement } from './components/WebServerManagement';
 import {
   Shield,
   Users,
@@ -27,11 +28,12 @@ import {
   Package,
   Clock,
   FileText,
+  Globe,
 } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const { user, permissions, isAuthenticated, isLoading, logout, hasPermission } = useAuth();
-  const [activeTab, setActiveTab] = useState<'system' | 'services' | 'processes' | 'storage' | 'network' | 'packages' | 'cron' | 'logs' | 'overview' | 'users' | 'roles'>('system');
+  const [activeTab, setActiveTab] = useState<'system' | 'services' | 'processes' | 'storage' | 'network' | 'packages' | 'cron' | 'logs' | 'webserver' | 'overview' | 'users' | 'roles'>('system');
 
   if (isLoading) {
     return (
@@ -55,6 +57,7 @@ const AppContent: React.FC = () => {
   const canReadCron = hasPermission('cron.read');
   const canReadLogs = hasPermission('logs.read');
   const canReadAudit = hasPermission('audit.read');
+  const canReadWebserver = hasPermission('webserver.read');
   const canReadUsers = hasPermission('users.read');
   const canReadRoles = hasPermission('roles.read');
 
@@ -232,6 +235,21 @@ const AppContent: React.FC = () => {
               </button>
             )}
 
+            {canReadWebserver && (
+              <button
+                id="nav-webserver-btn"
+                onClick={() => setActiveTab('webserver')}
+                className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  activeTab === 'webserver'
+                    ? 'bg-neutral-800 text-white shadow-xs'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-850'
+                }`}
+              >
+                <Globe className="w-4 h-4 text-neutral-400" />
+                <span>Web Server</span>
+              </button>
+            )}
+
             <button
               id="nav-overview-btn"
               onClick={() => setActiveTab('overview')}
@@ -292,6 +310,14 @@ const AppContent: React.FC = () => {
           {activeTab === 'packages' && canReadPackages && <PackageManagement />}
           {activeTab === 'cron' && canReadCron && <CronManagement />}
           {activeTab === 'logs' && (canReadLogs || canReadAudit) && <LogManagement permissions={permissions} />}
+          {activeTab === 'webserver' && canReadWebserver && (
+            <WebServerManagement
+              permissions={permissions}
+              onNavigateLogs={(source) => {
+                setActiveTab('logs');
+              }}
+            />
+          )}
 
           {activeTab === 'overview' && (
             <div className="space-y-6">
