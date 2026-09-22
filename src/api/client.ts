@@ -21,6 +21,15 @@ import {
   CronOverview,
 } from '../types/cron';
 import {
+  AuditLogPage,
+  AuditQueryParams,
+  LogEntry,
+  LogOverview,
+  LogPage,
+  LogQueryParams,
+  LogSource,
+} from '../types/logs';
+import {
   CPUInfo,
   DiskMountInfo,
   MemoryInfo,
@@ -381,6 +390,61 @@ export class ApiClient {
     return this.request<CronJobDeleteResult>(`/cron/jobs/${encodeURIComponent(id)}?${query.toString()}`, {
       method: 'DELETE',
     });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Log Management & Audit Foundation (Phase 10)
+  // ---------------------------------------------------------------------------
+
+  async getLogsOverview(): Promise<LogOverview> {
+    return this.request<LogOverview>('/logs/overview', { method: 'GET' });
+  }
+
+  async getLogSources(): Promise<LogSource[]> {
+    return this.request<LogSource[]>('/logs/sources', { method: 'GET' });
+  }
+
+  async getLogs(params?: LogQueryParams): Promise<LogPage> {
+    const query = new URLSearchParams();
+    if (params?.source) query.append('source', params.source);
+    if (params?.severity) query.append('severity', params.severity);
+    if (params?.service) query.append('service', params.service);
+    if (params?.unit) query.append('unit', params.unit);
+    if (params?.search) query.append('search', params.search);
+    if (params?.since) query.append('since', params.since);
+    if (params?.until) query.append('until', params.until);
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.page_size) query.append('page_size', params.page_size.toString());
+
+    const qs = query.toString();
+    const endpoint = qs ? `/logs?${qs}` : '/logs';
+    return this.request<LogPage>(endpoint, { method: 'GET' });
+  }
+
+  async getLogEntry(id: string, source?: string): Promise<LogEntry> {
+    const query = new URLSearchParams();
+    if (source) query.append('source', source);
+    const qs = query.toString();
+    const endpoint = qs ? `/logs/${encodeURIComponent(id)}?${qs}` : `/logs/${encodeURIComponent(id)}`;
+    return this.request<LogEntry>(endpoint, { method: 'GET' });
+  }
+
+  async getAuditLogs(params?: AuditQueryParams): Promise<AuditLogPage> {
+    const query = new URLSearchParams();
+    if (params?.user_id) query.append('user_id', params.user_id);
+    if (params?.username) query.append('username', params.username);
+    if (params?.action) query.append('action', params.action);
+    if (params?.resource_type) query.append('resource_type', params.resource_type);
+    if (params?.status) query.append('status', params.status);
+    if (params?.search) query.append('search', params.search);
+    if (params?.since) query.append('since', params.since);
+    if (params?.until) query.append('until', params.until);
+    if (params?.page) query.append('page', params.page.toString());
+    if (params?.page_size) query.append('page_size', params.page_size.toString());
+
+    const qs = query.toString();
+    const endpoint = qs ? `/logs/audit?${qs}` : '/logs/audit';
+    return this.request<AuditLogPage>(endpoint, { method: 'GET' });
   }
 }
 

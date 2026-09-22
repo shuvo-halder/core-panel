@@ -8,6 +8,10 @@ from agent.app.operations.cron import (
     handle_cron_list,
     handle_cron_update,
 )
+from agent.app.operations.logs import (
+    handle_logs_file_read,
+    handle_logs_journal_read,
+)
 from agent.app.operations.processes import (
     kill_process_operation,
     terminate_process_operation,
@@ -73,6 +77,10 @@ class OperationRegistry:
         self.register("cron.create", handle_cron_create)
         self.register("cron.update", handle_cron_update)
         self.register("cron.delete", handle_cron_delete)
+
+        # Allowlisted Log Operations (Phase 10)
+        self.register("logs.journal.read", handle_logs_journal_read)
+        self.register("logs.file.read", handle_logs_file_read)
 
 
 registry = OperationRegistry()

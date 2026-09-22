@@ -385,6 +385,10 @@ class Database:
                     (4, "0004_services_and_audit_log", now),
                 )
 
+            # Fetch current migration version
+            cursor.execute("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")
+            current_version = cursor.fetchone()[0]
+
             # Migration 5: Processes RBAC Permissions (Phase 5)
             if current_version < 5:
                 now = datetime.now(timezone.utc).isoformat()
@@ -655,6 +659,61 @@ class Database:
                 cursor.execute(
                     "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
                     (9, "0009_cron_permissions", now),
+                )
+
+            # Migration 10: Log Management & Audit Permissions (Phase 10)
+            if current_version < 10:
+                now = datetime.now(timezone.utc).isoformat()
+                logger.info("Applying migration 0010_log_permissions...")
+                log_permissions = [
+                    (
+                        "perm_logs_read",
+                        "logs.read",
+                        "View system, journal, and file logs",
+                        "logs",
+                        "read",
+                    ),
+                    (
+                        "perm_audit_read",
+                        "audit.read",
+                        "View control-plane application audit logs",
+                        "audit",
+                        "read",
+                    ),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in log_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
+
+                # Assign logs.read and audit.read to admin role
+                for p_id in ("perm_logs_read", "perm_audit_read"):
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                        VALUES (?, ?, ?)
+                    """,
+                        ("role_admin", p_id, now),
+                    )
+
+                # Assign logs.read and audit.read to viewer role
+                for p_id in ("perm_logs_read", "perm_audit_read"):
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                        VALUES (?, ?, ?)
+                    """,
+                        ("role_viewer", p_id, now),
+                    )
+
+                # Record migration 10
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (10, "0010_log_permissions", now),
                 )
 
             conn.commit()

@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 
@@ -698,3 +699,143 @@ class ILinuxProvider(ABC):
 
     os: IOSProvider
     runner: ICommandRunner
+
+
+# -----------------------------------------------------------------------------
+# Phase 10: Log Management & Audit Foundation Contracts
+# -----------------------------------------------------------------------------
+
+
+class LogSourceType(str, Enum):
+    JOURNAL = "JOURNAL"
+    FILE = "FILE"
+
+
+class LogSeverity(str, Enum):
+    EMERG = "EMERG"
+    ALERT = "ALERT"
+    CRIT = "CRIT"
+    ERR = "ERR"
+    WARNING = "WARNING"
+    NOTICE = "NOTICE"
+    INFO = "INFO"
+    DEBUG = "DEBUG"
+
+
+@dataclass(frozen=True)
+class LogSource:
+    """Represents an approved, allowlisted log source."""
+
+    id: str
+    name: str
+    source_type: str  # "JOURNAL" or "FILE"
+    path: Optional[str]
+    available: bool
+    size_bytes: Optional[int] = None
+    last_modified: Optional[str] = None
+    description: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class LogEntry:
+    """Structured, sanitized log event."""
+
+    id: str
+    timestamp: str
+    source: str
+    hostname: Optional[str] = None
+    service: Optional[str] = None
+    unit: Optional[str] = None
+    severity: str = "INFO"
+    facility: Optional[str] = None
+    message: str = ""
+    pid: Optional[int] = None
+    uid: Optional[int] = None
+    boot_id: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
+
+
+@dataclass(frozen=True)
+class LogOverview:
+    """Aggregated metrics across log sources."""
+
+    available_sources: List[LogSource]
+    journal_available: bool
+    total_sources_count: int
+    active_sources_count: int
+    severity_counts: Dict[str, int]
+    latest_timestamp: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class LogPage:
+    """Paginated collection of log entries."""
+
+    items: List[LogEntry]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+    source: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class AuditLogEntry:
+    """Safe read-only representation of an application audit record."""
+
+    id: str
+    user_id: Optional[str]
+    username: str
+    action: str
+    resource_type: str
+    resource_id: str
+    status: str
+    details: Optional[str]
+    ip_address: Optional[str]
+    request_id: Optional[str]
+    created_at: str
+
+
+@dataclass(frozen=True)
+class AuditLogPage:
+    """Paginated application audit log page."""
+
+    items: List[AuditLogEntry]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class ILogManager(ABC):
+    """Abstract contract for safe Linux log discovery and read-only inspection."""
+
+    @abstractmethod
+    async def get_overview(self) -> LogOverview:
+        pass
+
+    @abstractmethod
+    async def get_sources(self) -> List[LogSource]:
+        pass
+
+    @abstractmethod
+    async def query_logs(
+        self,
+        source: Optional[str] = None,
+        severity: Optional[str] = None,
+        service: Optional[str] = None,
+        unit: Optional[str] = None,
+        search: Optional[str] = None,
+        since: Optional[str] = None,
+        until: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 50,
+    ) -> LogPage:
+        pass
+
+    @abstractmethod
+    async def get_log_entry(
+        self, entry_id: str, source: Optional[str] = None
+    ) -> Optional[LogEntry]:
+        pass
+

@@ -413,4 +413,205 @@ def validate_cron_comment(comment: Any) -> Optional[str]:
     return clean
 
 
+# -----------------------------------------------------------------------------
+# Phase 10: Log Management & Audit Validators
+# -----------------------------------------------------------------------------
+
+APPROVED_LOG_SOURCES = frozenset({
+    "JOURNAL",
+    "SYSLOG",
+    "AUTH",
+    "MESSAGES",
+    "KERNEL",
+    "DMESG",
+    "DPKG",
+    "BOOT",
+    "NGINX_ACCESS",
+    "NGINX_ERROR",
+    "ALTERNATIVES",
+})
+
+APPROVED_LOG_SEVERITIES = frozenset({
+    "EMERG",
+    "ALERT",
+    "CRIT",
+    "ERR",
+    "WARNING",
+    "NOTICE",
+    "INFO",
+    "DEBUG",
+})
+
+LOG_SERVICE_PATTERN: Pattern[str] = re.compile(r"^[a-zA-Z0-9_\@\.\-]+$")
+LOG_UNIT_PATTERN: Pattern[str] = re.compile(
+    r"^[a-zA-Z0-9_\@\.\-]+\.(service|socket|target|timer|mount|path|slice|scope)$"
+)
+LOG_TIMESTAMP_PATTERN: Pattern[str] = re.compile(
+    r"^[0-9]{4}-[0-9]{2}-[0-9]{2}([T\s][0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]+)?)?(Z|[+-][0-9]{2}:?[0-9]{2})?)?$"
+)
+
+
+def validate_log_source_id(source: Any) -> str:
+    """
+    Validates a requested log source ID against the strict internal allowlist.
+    Prevents path traversal, absolute path injection, or unknown log sources.
+    """
+    if not isinstance(source, str):
+        raise BadRequestError("Log source ID must be a string", code="INVALID_LOG_SOURCE")
+
+    clean = source.strip().upper()
+    if not clean:
+        raise BadRequestError("Log source ID cannot be empty", code="INVALID_LOG_SOURCE")
+
+    if "/" in clean or "\\" in clean or ".." in clean:
+        raise BadRequestError(
+            "Log source ID must be a symbolic identifier, not a file path",
+            code="INVALID_LOG_SOURCE",
+        )
+
+    if clean not in APPROVED_LOG_SOURCES:
+        raise BadRequestError(
+            f"Unknown or prohibited log source ID: '{clean}'",
+            code="INVALID_LOG_SOURCE",
+        )
+
+    return clean
+
+
+def validate_log_severity(severity: Any) -> Optional[str]:
+    """Validates an optional log severity level against standard syslog priorities."""
+    if severity is None:
+        return None
+
+    if not isinstance(severity, str):
+        raise BadRequestError("Log severity must be a string", code="INVALID_LOG_SEVERITY")
+
+    clean = severity.strip().upper()
+    if not clean:
+        return None
+
+    if clean not in APPROVED_LOG_SEVERITIES:
+        raise BadRequestError(
+            f"Invalid log severity: '{clean}'. Must be one of: {', '.join(sorted(APPROVED_LOG_SEVERITIES))}",
+            code="INVALID_LOG_SEVERITY",
+        )
+
+    return clean
+
+
+def validate_log_service(service: Any) -> Optional[str]:
+    """Validates a service or daemon name filter."""
+    if service is None:
+        return None
+
+    if not isinstance(service, str):
+        raise BadRequestError("Service filter must be a string", code="INVALID_LOG_SERVICE")
+
+    clean = service.strip()
+    if not clean:
+        return None
+
+    if len(clean) > 64:
+        raise BadRequestError(
+            f"Service filter exceeds maximum length of 64 characters (got {len(clean)})",
+            code="INVALID_LOG_SERVICE",
+        )
+
+    if not LOG_SERVICE_PATTERN.match(clean):
+        raise BadRequestError(
+            f"Invalid service filter format: '{clean}'",
+            code="INVALID_LOG_SERVICE",
+        )
+
+    return clean
+
+
+def validate_log_unit(unit: Any) -> Optional[str]:
+    """Validates a systemd unit filter."""
+    if unit is None:
+        return None
+
+    if not isinstance(unit, str):
+        raise BadRequestError("Unit filter must be a string", code="INVALID_LOG_UNIT")
+
+    clean = unit.strip()
+    if not clean:
+        return None
+
+    if len(clean) > 64:
+        raise BadRequestError(
+            f"Unit filter exceeds maximum length of 64 characters (got {len(clean)})",
+            code="INVALID_LOG_UNIT",
+        )
+
+    if not LOG_UNIT_PATTERN.match(clean):
+        raise BadRequestError(
+            f"Invalid unit filter format: '{clean}'. Must end in .service, .socket, etc.",
+            code="INVALID_LOG_UNIT",
+        )
+
+    return clean
+
+
+def validate_log_search(search: Any) -> Optional[str]:
+    """
+    Validates an application-level log search query.
+    Enforces maximum length bounds and rejects null bytes.
+    """
+    if search is None:
+        return None
+
+    if not isinstance(search, str):
+        raise BadRequestError("Search query must be a string", code="INVALID_LOG_SEARCH")
+
+    clean = search.strip()
+    if not clean:
+        return None
+
+    if len(clean) > 100:
+        raise BadRequestError(
+            f"Search query exceeds maximum length of 100 characters (got {len(clean)})",
+            code="INVALID_LOG_SEARCH",
+        )
+
+    if "\x00" in clean or "\n" in clean or "\r" in clean:
+        raise BadRequestError("Search query cannot contain null bytes or newline characters", code="INVALID_LOG_SEARCH")
+
+    return clean
+
+
+def validate_log_timestamp(ts: Any, param_name: str = "timestamp") -> Optional[str]:
+    """Validates an ISO8601 or date-time filter string."""
+    if ts is None:
+        return None
+
+    if not isinstance(ts, str):
+        raise BadRequestError(f"Filter '{param_name}' must be a string", code="INVALID_LOG_TIMESTAMP")
+
+    clean = ts.strip()
+    if not clean:
+        return None
+
+    if len(clean) > 64:
+        raise BadRequestError(
+            f"Filter '{param_name}' exceeds maximum length of 64 characters",
+            code="INVALID_LOG_TIMESTAMP",
+        )
+
+    if "\x00" in clean or "\n" in clean or "\r" in clean:
+        raise BadRequestError(
+            f"Filter '{param_name}' contains illegal characters",
+            code="INVALID_LOG_TIMESTAMP",
+        )
+
+    if not LOG_TIMESTAMP_PATTERN.match(clean):
+        raise BadRequestError(
+            f"Filter '{param_name}' must be a valid ISO8601 date/time (e.g. '2026-09-21T00:00:00Z')",
+            code="INVALID_LOG_TIMESTAMP",
+        )
+
+    return clean
+
+
+
 
