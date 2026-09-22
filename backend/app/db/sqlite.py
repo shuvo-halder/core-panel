@@ -52,13 +52,15 @@ class Database:
             row = cursor.fetchone()
             now = datetime.now(timezone.utc).isoformat()
             if not row:
+                v_ver = str(getattr(settings, "APP_VERSION", "1.0.0") or "1.0.0")
+                v_env = str(getattr(settings, "ENVIRONMENT", "development") or "development")
                 cursor.execute(
                     "INSERT INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)",
-                    ("version", settings.APP_VERSION, now),
+                    ("version", v_ver, now),
                 )
                 cursor.execute(
                     "INSERT INTO app_metadata (key, value, updated_at) VALUES (?, ?, ?)",
-                    ("environment", settings.ENVIRONMENT, now),
+                    ("environment", v_env, now),
                 )
 
             # Record initial baseline migration
@@ -803,6 +805,60 @@ class Database:
                 cursor.execute(
                     "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
                     (11, "0011_webserver_permissions", now),
+                )
+
+            # Migration 12: Firewall RBAC Permissions (Phase 12)
+            if current_version < 12:
+                now = datetime.now(timezone.utc).isoformat()
+                logger.info("Applying migration 0012_firewall_permissions...")
+                firewall_permissions = [
+                    (
+                        "perm_firewall_read",
+                        "firewall.read",
+                        "View firewall status, policies, and active packet filtering rules",
+                        "firewall",
+                        "read",
+                    ),
+                    (
+                        "perm_firewall_manage",
+                        "firewall.manage",
+                        "Create/delete firewall rules and toggle firewall state with lockout protection",
+                        "firewall",
+                        "manage",
+                    ),
+                ]
+                for p_id, p_name, p_desc, p_res, p_act in firewall_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO permissions (id, name, description, resource, action, created_at)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                        (p_id, p_name, p_desc, p_res, p_act, now),
+                    )
+
+                # Assign all firewall permissions to admin role
+                for p_id, _, _, _, _ in firewall_permissions:
+                    cursor.execute(
+                        """
+                        INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                        VALUES (?, ?, ?)
+                    """,
+                        ("role_admin", p_id, now),
+                    )
+
+                # Assign only firewall.read to viewer role
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO role_permissions (role_id, permission_id, assigned_at)
+                    VALUES (?, ?, ?)
+                """,
+                    ("role_viewer", "perm_firewall_read", now),
+                )
+
+                # Record migration 12
+                cursor.execute(
+                    "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
+                    (12, "0012_firewall_permissions", now),
                 )
 
             conn.commit()

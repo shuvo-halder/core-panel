@@ -22,6 +22,7 @@ from backend.app.api.v1.packages import router as packages_router
 from backend.app.api.v1.system import router as system_router
 from backend.app.api.v1.users import router as users_router
 from backend.app.api.v1.webserver import router as webserver_router
+from backend.app.api.v1.firewall import router as firewall_router
 from backend.app.auth.service import auth_service
 from backend.app.core.config import settings
 from backend.app.core.errors import (
@@ -118,6 +119,7 @@ def create_application() -> FastAPI:
     app.include_router(cron_router, prefix="/api/v1")
     app.include_router(logs_router, prefix="/api/v1")
     app.include_router(webserver_router, prefix="/api/v1")
+    app.include_router(firewall_router, prefix="/api/v1")
 
     return app
 

@@ -8,6 +8,12 @@ from agent.app.operations.cron import (
     handle_cron_list,
     handle_cron_update,
 )
+from agent.app.operations.firewall import (
+    handle_firewall_rule_add,
+    handle_firewall_rule_delete,
+    handle_firewall_status,
+    handle_firewall_toggle,
+)
 from agent.app.operations.logs import (
     handle_logs_file_read,
     handle_logs_journal_read,
@@ -99,6 +105,12 @@ class OperationRegistry:
         self.register("nginx.site_enable", handle_nginx_site_enable)
         self.register("nginx.site_disable", handle_nginx_site_disable)
         self.register("nginx.reload", handle_nginx_reload)
+
+        # Allowlisted Firewall Management Operations (Phase 12)
+        self.register("firewall.status", handle_firewall_status)
+        self.register("firewall.rule_add", handle_firewall_rule_add)
+        self.register("firewall.rule_delete", handle_firewall_rule_delete)
+        self.register("firewall.toggle", handle_firewall_toggle)
 
 
 registry = OperationRegistry()

@@ -1,3 +1,4 @@
+import ipaddress
 import os
 import re
 from typing import Any, List, Optional, Pattern, Set, Tuple
@@ -981,6 +982,142 @@ def validate_client_max_body_size(size: Any) -> str:
         )
 
     return clean
+
+
+# =========================================================================
+# Phase 12: Firewall Management Validators
+# =========================================================================
+
+ALLOWED_FIREWALL_PROTOCOLS = frozenset({"tcp", "udp", "any"})
+ALLOWED_FIREWALL_ACTIONS = frozenset({"allow", "deny"})
+ALLOWED_FIREWALL_DIRECTIONS = frozenset({"in", "out"})
+FIREWALL_COMMENT_PATTERN = re.compile(r"^[a-zA-Z0-9_\-\.\s]{1,64}$")
+
+
+def validate_firewall_port(port: Any) -> str:
+    """
+    Validates a firewall target port (single port 1-65535 or port range 'start:end').
+    Rejects negative numbers, 0, >65535, invalid ranges, and injection strings.
+    """
+    if port is None:
+        raise BadRequestError("Firewall port is required", code="INVALID_FIREWALL_PORT")
+
+    clean = str(port).strip()
+    if not clean:
+        raise BadRequestError("Firewall port cannot be empty", code="INVALID_FIREWALL_PORT")
+
+    if any(c in clean for c in "\x00\n\r\t;|$`'\"<>"):
+        raise BadRequestError("Prohibited characters in firewall port", code="INVALID_FIREWALL_PORT")
+
+    if ":" in clean:
+        parts = clean.split(":")
+        if len(parts) != 2:
+            raise BadRequestError(f"Invalid port range format: '{clean}'", code="INVALID_FIREWALL_PORT")
+        if not parts[0].isdigit() or not parts[1].isdigit():
+            raise BadRequestError(f"Port range must contain numbers: '{clean}'", code="INVALID_FIREWALL_PORT")
+        p_start, p_end = int(parts[0]), int(parts[1])
+        if p_start < 1 or p_start > 65535 or p_end < 1 or p_end > 65535:
+            raise BadRequestError(f"Port range values must be between 1 and 65535: '{clean}'", code="INVALID_FIREWALL_PORT")
+        if p_start > p_end:
+            raise BadRequestError(f"Port range start ({p_start}) cannot exceed end ({p_end})", code="INVALID_FIREWALL_PORT")
+        return f"{p_start}:{p_end}"
+    else:
+        if not clean.isdigit():
+            raise BadRequestError(f"Port must be an integer: '{clean}'", code="INVALID_FIREWALL_PORT")
+        p_num = int(clean)
+        if p_num < 1 or p_num > 65535:
+            raise BadRequestError(f"Port must be between 1 and 65535: {p_num}", code="INVALID_FIREWALL_PORT")
+        return str(p_num)
+
+
+def validate_firewall_protocol(protocol: Any) -> str:
+    """Validates firewall protocol (tcp, udp, any)."""
+    if protocol is None:
+        return "any"
+    clean = str(protocol).strip().lower()
+    if clean not in ALLOWED_FIREWALL_PROTOCOLS:
+        raise BadRequestError(
+            f"Invalid firewall protocol: '{clean}'. Allowed: {', '.join(sorted(ALLOWED_FIREWALL_PROTOCOLS))}",
+            code="INVALID_FIREWALL_PROTOCOL",
+        )
+    return clean
+
+
+def validate_firewall_action(action: Any) -> str:
+    """Validates firewall action (allow, deny)."""
+    if action is None:
+        raise BadRequestError("Firewall action is required", code="INVALID_FIREWALL_ACTION")
+    clean = str(action).strip().lower()
+    if clean not in ALLOWED_FIREWALL_ACTIONS:
+        raise BadRequestError(
+            f"Invalid firewall action: '{clean}'. Allowed: {', '.join(sorted(ALLOWED_FIREWALL_ACTIONS))}",
+            code="INVALID_FIREWALL_ACTION",
+        )
+    return clean
+
+
+def validate_firewall_direction(direction: Any) -> str:
+    """Validates firewall traffic direction (in, out)."""
+    if direction is None:
+        return "in"
+    clean = str(direction).strip().lower()
+    if clean not in ALLOWED_FIREWALL_DIRECTIONS:
+        raise BadRequestError(
+            f"Invalid firewall direction: '{clean}'. Allowed: {', '.join(sorted(ALLOWED_FIREWALL_DIRECTIONS))}",
+            code="INVALID_FIREWALL_DIRECTION",
+        )
+    return clean
+
+
+def validate_firewall_source(source: Any) -> str:
+    """
+    Validates firewall source IP or CIDR using ipaddress module.
+    Allows 'any', 'anywhere', '0.0.0.0/0', '::/0'.
+    Rejects malformed addresses and injection tokens.
+    """
+    if source is None:
+        return "any"
+
+    clean = str(source).strip()
+    if not clean or clean.lower() in ("any", "anywhere", "0.0.0.0/0", "::/0"):
+        return "any"
+
+    if any(c in clean for c in "\x00\n\r\t;|$`'\"<>"):
+        raise BadRequestError("Prohibited characters in firewall source address", code="INVALID_FIREWALL_SOURCE")
+
+    try:
+        net = ipaddress.ip_network(clean, strict=False)
+        return str(net)
+    except ValueError:
+        raise BadRequestError(
+            f"Invalid IP address or CIDR network: '{clean}'",
+            code="INVALID_FIREWALL_SOURCE",
+        )
+
+
+def validate_firewall_comment(comment: Any) -> Optional[str]:
+    """
+    Validates firewall rule comment data.
+    Enforces maximum 64 characters, safe characters, and forbids newlines and control characters.
+    """
+    if comment is None:
+        return None
+
+    clean = str(comment).strip()
+    if not clean:
+        return None
+
+    if any(c in clean for c in "\x00\n\r\t;|$`'\"<>"):
+        raise BadRequestError("Prohibited characters in firewall comment", code="INVALID_FIREWALL_COMMENT")
+
+    if len(clean) > 64:
+        raise BadRequestError("Firewall comment exceeds maximum length of 64 characters", code="INVALID_FIREWALL_COMMENT")
+
+    if not FIREWALL_COMMENT_PATTERN.match(clean):
+        raise BadRequestError("Firewall comment contains invalid characters", code="INVALID_FIREWALL_COMMENT")
+
+    return clean
+
 
 
 

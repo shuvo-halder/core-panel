@@ -12,8 +12,10 @@ import { PackageManagement } from './components/PackageManagement';
 import { CronManagement } from './components/CronManagement';
 import { LogManagement } from './components/LogManagement';
 import { WebServerManagement } from './components/WebServerManagement';
+import { FirewallManagement } from './components/FirewallManagement';
 import {
   Shield,
+  ShieldAlert,
   Users,
   LogOut,
   Activity,
@@ -33,7 +35,7 @@ import {
 
 const AppContent: React.FC = () => {
   const { user, permissions, isAuthenticated, isLoading, logout, hasPermission } = useAuth();
-  const [activeTab, setActiveTab] = useState<'system' | 'services' | 'processes' | 'storage' | 'network' | 'packages' | 'cron' | 'logs' | 'webserver' | 'overview' | 'users' | 'roles'>('system');
+  const [activeTab, setActiveTab] = useState<'system' | 'services' | 'processes' | 'storage' | 'network' | 'packages' | 'cron' | 'logs' | 'webserver' | 'firewall' | 'overview' | 'users' | 'roles'>('system');
 
   if (isLoading) {
     return (
@@ -58,6 +60,7 @@ const AppContent: React.FC = () => {
   const canReadLogs = hasPermission('logs.read');
   const canReadAudit = hasPermission('audit.read');
   const canReadWebserver = hasPermission('webserver.read');
+  const canReadFirewall = hasPermission('firewall.read');
   const canReadUsers = hasPermission('users.read');
   const canReadRoles = hasPermission('roles.read');
 
@@ -250,6 +253,21 @@ const AppContent: React.FC = () => {
               </button>
             )}
 
+            {canReadFirewall && (
+              <button
+                id="nav-firewall-btn"
+                onClick={() => setActiveTab('firewall')}
+                className={`w-full flex items-center space-x-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                  activeTab === 'firewall'
+                    ? 'bg-neutral-800 text-white shadow-xs'
+                    : 'text-neutral-400 hover:text-white hover:bg-neutral-850'
+                }`}
+              >
+                <ShieldAlert className="w-4 h-4 text-neutral-400" />
+                <span>Firewall</span>
+              </button>
+            )}
+
             <button
               id="nav-overview-btn"
               onClick={() => setActiveTab('overview')}
@@ -317,6 +335,9 @@ const AppContent: React.FC = () => {
                 setActiveTab('logs');
               }}
             />
+          )}
+          {activeTab === 'firewall' && canReadFirewall && (
+            <FirewallManagement permissions={permissions} />
           )}
 
           {activeTab === 'overview' && (

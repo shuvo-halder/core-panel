@@ -956,3 +956,70 @@ class INginxManager(ABC):
         pass
 
 
+@dataclass(frozen=True)
+class FirewallRule:
+    """Normalized representation of a packet filter rule."""
+
+    rule_index: int
+    port: str
+    protocol: str
+    action: str
+    direction: str
+    source: str
+    family: str
+    comment: Optional[str] = None
+    signature: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class FirewallStatus:
+    """Normalized status of the Linux firewall subsystem."""
+
+    installed: bool
+    active: bool
+    default_incoming: str
+    default_outgoing: str
+    default_routed: str
+    rules: List[FirewallRule]
+    management_ports: List[int] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class FirewallRuleCreate:
+    """Validated input model for adding a bounded firewall rule."""
+
+    port: str
+    protocol: str = "tcp"
+    action: str = "allow"
+    direction: str = "in"
+    source_ip: str = "any"
+    comment: Optional[str] = None
+
+
+class IFirewallManager(ABC):
+    """Abstract contract for secure Linux firewall management."""
+
+    @abstractmethod
+    async def get_status(self) -> FirewallStatus:
+        """Inspects firewall daemon, policies, and active packet filtering rules."""
+        pass
+
+    @abstractmethod
+    async def add_rule(self, rule: FirewallRuleCreate) -> Dict[str, Any]:
+        """Validates and deploys a bounded allow or deny packet filter rule."""
+        pass
+
+    @abstractmethod
+    async def delete_rule(
+        self, rule_index: int, expected_signature: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Safely removes a rule with signature concurrency verification and lockout prevention."""
+        pass
+
+    @abstractmethod
+    async def toggle_firewall(self, enable: bool) -> Dict[str, Any]:
+        """Safely enables or disables packet filtering with anti-lockout protection."""
+        pass
+
+
+
